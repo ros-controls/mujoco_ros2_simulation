@@ -98,8 +98,8 @@ private:
   std::recursive_mutex* sim_mutex_{ nullptr };
 
   // Data containers for the HW interface
-  std::vector<hardware_interface::StateInterface> state_interfaces_;
-  std::vector<hardware_interface::CommandInterface> command_interfaces_;
+  std::unordered_map<std::string, hardware_interface::ComponentInfo> joint_hw_info_;
+  std::unordered_map<std::string, hardware_interface::ComponentInfo> sensors_hw_info_;
 
   // Data containers for the HW interface
   std::vector<JointState> joint_states_;
