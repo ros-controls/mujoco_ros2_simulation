@@ -796,17 +796,39 @@ void MujocoSystemInterface::register_sensors(const hardware_interface::HardwareI
   {
     auto sensor = hardware_info.sensors.at(sensor_index);
     const std::string sensor_name = sensor.name;
-    const auto sensor_prefix = sensor_name.substr(0, sensor_name.rfind('_'));
+
+    if (sensor.parameters.count("mujoco_type") == 0)
+    {
+      RCLCPP_INFO_STREAM(rclcpp::get_logger("MujocoSystemInterface"),
+                         "Skipping sensor in ros2_control xacro: " << sensor_name);
+    }
+    const auto mujoco_type = sensor.parameters.at("mujoco_type");
+
+    // If there is a specific sensor name provided we use that, otherwise we assume the mujoco model's
+    // sensor is named identiacally to the ros2_control hardware interface's.
+    std::string mujoco_sensor_name;
+    if (sensor.parameters.count("mujoco_sensor_name") == 0)
+    {
+      mujoco_sensor_name = sensor_name;
+    }
+    else
+    {
+      mujoco_sensor_name = sensor.parameters.at("mujoco_sensor_name");
+    }
+
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("MujocoSystemInterface"),
+                       "Adding sensor named: " << sensor_name << ", of type: " << mujoco_type
+                                               << ", mapping to the MJCF sensor: " << mujoco_sensor_name);
 
     // Add to the sensor hw information map
     sensors_hw_info_.insert(std::make_pair(sensor_name, sensor));
 
-    if (sensor.name.find("_fts") != std::string::npos)
+    if (mujoco_type == "fts")
     {
       FTSensorData sensor_data;
       sensor_data.name = sensor_name;
-      sensor_data.force.name = sensor_prefix + "_force";
-      sensor_data.torque.name = sensor_prefix + "_torque";
+      sensor_data.force.name = mujoco_sensor_name + "_force";
+      sensor_data.torque.name = mujoco_sensor_name + "_torque";
 
       int force_sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, sensor_data.force.name.c_str());
       int torque_sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, sensor_data.torque.name.c_str());
@@ -824,13 +846,13 @@ void MujocoSystemInterface::register_sensors(const hardware_interface::HardwareI
       ft_sensor_data_.push_back(sensor_data);
     }
 
-    else if (sensor.name.find("_imu") != std::string::npos)
+    else if (mujoco_type == "imu")
     {
       IMUSensorData sensor_data;
       sensor_data.name = sensor_name;
-      sensor_data.orientation.name = sensor_prefix + "_quat";
-      sensor_data.angular_velocity.name = sensor_prefix + "_gyro";
-      sensor_data.linear_acceleration.name = sensor_prefix + "_accel";
+      sensor_data.orientation.name = mujoco_sensor_name + "_quat";
+      sensor_data.angular_velocity.name = mujoco_sensor_name + "_gyro";
+      sensor_data.linear_acceleration.name = mujoco_sensor_name + "_accel";
 
       int quat_id = mj_name2id(mj_model_, mjOBJ_SENSOR, sensor_data.orientation.name.c_str());
       int gyro_id = mj_name2id(mj_model_, mjOBJ_SENSOR, sensor_data.angular_velocity.name.c_str());
@@ -848,6 +870,11 @@ void MujocoSystemInterface::register_sensors(const hardware_interface::HardwareI
       sensor_data.linear_acceleration.mj_sensor_index = mj_model_->sensor_adr[accel_id];
 
       imu_sensor_data_.push_back(sensor_data);
+    }
+    else
+    {
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("MujocoSystemInterface"),
+                          "Invalid sensor type passed to the mujoco hardware interface: " << mujoco_type);
     }
   }
 }
