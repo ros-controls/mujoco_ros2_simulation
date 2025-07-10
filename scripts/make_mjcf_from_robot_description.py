@@ -201,11 +201,11 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.obj")
 
             else:
-                shutil.copy2(full_filepath, f"{directory}assets/")
+                shutil.copy2(full_filepath, f'{directory}assets/{assets_relative_filepath}.stl')
                 xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.stl")
                 pass
         elif filename_ext.lower() == ".obj":
-            shutil.copy2(full_filepath, f"{directory}assets/")
+            shutil.copy2(full_filepath, f'{directory}assets/{assets_relative_filepath}.obj')
             xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.obj")
             pass
             # objs are ok as is
