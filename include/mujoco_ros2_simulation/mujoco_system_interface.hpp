@@ -67,6 +67,9 @@ public:
   hardware_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State& previous_state) override;
   hardware_interface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State& previous_state) override;
 
+  hardware_interface::return_type perform_command_mode_switch(const std::vector<std::string>& start_interfaces,
+                                                              const std::vector<std::string>& stop_interfaces) override;
+
   hardware_interface::return_type read(const rclcpp::Time& time, const rclcpp::Duration& period) override;
   hardware_interface::return_type write(const rclcpp::Time& time, const rclcpp::Duration& period) override;
 
