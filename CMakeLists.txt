@@ -8,8 +8,8 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(control_toolbox REQUIRED)
 find_package(controller_manager REQUIRED)
+find_package(Eigen3 REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(joint_limits REQUIRED)
@@ -110,7 +110,6 @@ add_library(mujoco_ros2_simulation SHARED
     src/mujoco_lidar.cpp
 )
 ament_target_dependencies(mujoco_ros2_simulation
-  control_toolbox
   controller_manager
   hardware_interface
   pluginlib
@@ -121,6 +120,7 @@ ament_target_dependencies(mujoco_ros2_simulation
 target_link_libraries(mujoco_ros2_simulation
   ${MUJOCO_LIB}
   mujoco::libsimulate
+  Eigen3::Eigen
   Threads::Threads
   lodepng
   glfw

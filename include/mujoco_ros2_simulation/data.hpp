@@ -19,11 +19,12 @@
 
 #pragma once
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+
 #include <string>
 #include <vector>
 
-#include <control_toolbox/pid.hpp>
 #include <joint_limits/joint_limits.hpp>
 
 namespace mujoco_ros2_simulation
@@ -41,15 +42,6 @@ struct JointState
   double position_command;
   double velocity_command;
   double effort_command;
-  double min_position_command;
-  double max_position_command;
-  double min_velocity_command;
-  double max_velocity_command;
-  double min_effort_command;
-  double max_effort_command;
-  control_toolbox::Pid position_pid;
-  control_toolbox::Pid velocity_pid;
-  bool is_pid_enabled{ false };
   joint_limits::JointLimits joint_limits;
   bool is_mimic{ false };
   int mimicked_joint_index;

@@ -10,7 +10,6 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>control_toolbox</depend>
   <depend>controller_manager</depend>
   <depend>hardware_interface</depend>
   <depend>joint_limits</depend>
