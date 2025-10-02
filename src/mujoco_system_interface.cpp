@@ -865,9 +865,6 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
     joint_states_.at(joint_index) = joint_state;
     JointState& last_joint_state = joint_states_.at(joint_index);
 
-    // TODO: Get joint limit from urdf
-    // get_joint_limits(urdf_model.getJoint(last_joint_state.name), last_joint_state.joint_limits);
-
     // check if mimicked
     if (joint.parameters.find("mimic") != joint.parameters.end())
     {
