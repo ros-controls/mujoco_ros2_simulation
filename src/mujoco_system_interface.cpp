@@ -802,6 +802,12 @@ hardware_interface::return_type MujocoSystemInterface::write(const rclcpp::Time&
   // TODO: Support command limits. For now those ranges can be limited in the mujoco actuators themselves.
   for (auto& joint_state : joint_states_)
   {
+    if (joint_state.mj_actuator_id == -1)
+    {
+      // Skip joints without actuators
+      continue;
+    }
+
     if (joint_state.is_position_control_enabled)
     {
       mj_data_->ctrl[joint_state.mj_actuator_id] = joint_state.position_command;
