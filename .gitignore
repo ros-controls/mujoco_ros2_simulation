@@ -3,3 +3,15 @@
 
 # Mujoco logs
 MUJOCO_LOG.TXT
+
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# Build output
+build/*
+install/*
+log/*
+
+# Cloned mujoco src
+mujoco/*
