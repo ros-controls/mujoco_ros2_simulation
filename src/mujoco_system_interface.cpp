@@ -434,6 +434,10 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
     return hardware_interface::CallbackReturn::FAILURE;
   }
 
+  // Disable the rangefinder flag at startup so that we don't get the yellow lines.
+  // We can still turn this on manually if desired.
+  sim_->opt.flags[mjVIS_RANGEFINDER] = false;
+
   // When the interface is activated, we start the physics engine.
   physics_thread_ = std::thread([this]() {
     // Load the simulation and do an initial forward pass
