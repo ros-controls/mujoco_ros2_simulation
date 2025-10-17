@@ -1097,7 +1097,10 @@ def main(args=None):
     parser.add_argument("-o", "--output", default="mjcf_data", help="Generated output path")
     parser.add_argument("-c", "--convert_stl_to_obj", action="store_true", help="If we should convert .stls to .objs")
     parser.add_argument(
-        "-f", "--add_free_joint", action="store_true", help="Adds a free joint as the base link for mobile robots"
+        "-f",
+        "--add_free_joint",
+        action="store_true",
+        help="Adds a free joint before the root link of the robot in the urdf before conversion",
     )
 
     # remove ros args to make argparser heppy
