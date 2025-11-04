@@ -23,11 +23,6 @@ set(MUJOCO_LIB mujoco::mujoco)
 get_target_property(MUJOCO_INCLUDE_DIR mujoco::mujoco INTERFACE_INCLUDE_DIRECTORIES)
 set(MUJOCO_SIMULATE_DIR ${MUJOCO_INCLUDE_DIR}/../simulate)
 
-message(STATUS "Using MuJoCo from vendor package")
-message(STATUS "  MUJOCO_INCLUDE_DIR: ${MUJOCO_INCLUDE_DIR}")
-message(STATUS "  MUJOCO_SIMULATE_DIR: ${MUJOCO_SIMULATE_DIR}")
-
-
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # Fetch lodepng dependency.
