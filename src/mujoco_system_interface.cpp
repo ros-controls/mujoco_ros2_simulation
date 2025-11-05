@@ -249,22 +249,6 @@ mjModel* LoadModel(const char* file, mj::Simulate& sim, rclcpp::Node::SharedPtr 
     mju::strcpy_arr(sim.load_error, loadError);
     return mnew;
   }
-
-  // // Try to geto the mujoco_model from parameter.
-  // if (node->has_parameter("mujoco_model_path"))
-  // {
-  //   mujoco_model_path = node->get_parameter("mujoco_model_path").as_string();
-  //   if (!mujoco_model_path.empty())
-  //   {
-  //     RCLCPP_INFO(node->get_logger(), "Using MuJoCo model from path parameter: %s", mujoco_model_path.c_str());
-  //     mnew=mj_loadXML(mujoco_model_path.c_str(), nullptr, nullptr, 0);
-  //     return mnew;
-  //   }
-  // }
-  // RCLCPP_WARN(
-  //   node->get_logger(),
-  //   "Failed to get robot_description from parameter. Will listen on the ~/mujoco_robot_description "
-  //   "topic...");
   
   // Try to get the mujoco model from topic
   rclcpp::QoS qos_profile(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
