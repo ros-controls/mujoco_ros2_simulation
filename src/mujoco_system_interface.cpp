@@ -43,6 +43,8 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include "control_toolbox/pid.hpp"
+
 #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
 
 using namespace std::chrono_literals;
@@ -53,6 +55,8 @@ const double kSimRefreshFraction = 0.7;  // fraction of refresh available for si
 const int kErrorLength = 1024;           // load error string length
 
 using Seconds = std::chrono::duration<double>;
+
+/// \brief vector with the current actuator for each joint
 std::unordered_map<std::string, std::string> actuator_map;
 
 namespace mujoco_ros2_simulation
@@ -249,7 +253,6 @@ mjModel* LoadModel(const char* file, mj::Simulate& sim, rclcpp::Node::SharedPtr 
     if (mju::strlen_arr(filename) > 4 && !std::strncmp(filename + mju::strlen_arr(filename) - 4, ".mjb",
                                                       mju::sizeof_arr(filename) - mju::strlen_arr(filename) + 4))
     {
-      // Find a way
       mnew = mj_loadModel(filename, nullptr);
       if (!mnew)
       {
@@ -262,7 +265,7 @@ mjModel* LoadModel(const char* file, mj::Simulate& sim, rclcpp::Node::SharedPtr 
       actuator_map = parse_actuators_from_xml(filename);
       for (const auto& [name, type] : actuator_map)
       {
-        RCLCPP_INFO(node->get_logger(), "Actuator '%s' type '%s'", name.c_str(), type.c_str());
+        RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Actuator '%s' type '%s'", name.c_str(), type.c_str());
       }
 
       mnew = mj_loadXML(filename, nullptr, loadError, kErrorLength);
@@ -578,6 +581,64 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+bool extractPIDFromParameters(
+  const std::string & control_mode, const std::string & joint_name,
+  control_toolbox::Pid & pid, rclcpp::Node::SharedPtr node)
+{
+  const std::string parameter_prefix = "pid_gains." + control_mode + "." + joint_name;
+  auto get_pid_entry = [node, parameter_prefix](const std::string & entry, double & value) -> bool {
+      try {
+        // Check if the parameter is declared, if not, declare the default value NaN
+        if (!node->has_parameter(parameter_prefix + "." + entry)) {
+          node->declare_parameter<double>(
+            parameter_prefix + "." + entry,
+            std::numeric_limits<double>::quiet_NaN());
+        }
+        value = node->get_parameter(parameter_prefix + "." + entry).as_double();
+      } catch (rclcpp::exceptions::ParameterNotDeclaredException & ex) {
+        RCLCPP_ERROR(
+          node->get_logger(),
+          "Parameter '%s' not declared, with error %s", entry.c_str(), ex.what());
+        return false;
+      } catch (rclcpp::exceptions::InvalidParameterTypeException & ex) {
+        RCLCPP_ERROR(
+          node->get_logger(),
+          "Parameter '%s' has wrong type: %s", entry.c_str(), ex.what());
+        return false;
+      }
+      return std::isfinite(value);
+    };
+  bool are_pids_set = true;
+  double kp, ki, kd, max_integral_error, min_integral_error;
+  are_pids_set &= get_pid_entry("kp", kp);
+  are_pids_set &= get_pid_entry("ki", ki);
+  are_pids_set &= get_pid_entry("kd", kd);
+  if (are_pids_set) {
+    // RCLCPP_INFO(
+    //       node->get_logger(),
+    //       "Foundamental params set");
+    get_pid_entry("max_integral_error", max_integral_error);
+    get_pid_entry("min_integral_error", min_integral_error);
+    RCLCPP_INFO_STREAM(
+      node->get_logger(),
+      "Setting kp = " << kp << "\t"
+                      << " ki = " << ki << "\t"
+                      << " kd = " << kd << "\t"
+                      << " max_integral_error = " << max_integral_error << "\t"
+                      << " min_integral_error = " << min_integral_error << " from node parameters");
+    control_toolbox::AntiWindupStrategy antiwindup_strat;
+    antiwindup_strat.set_type("none");
+    antiwindup_strat.i_max = max_integral_error;
+    antiwindup_strat.i_min = min_integral_error;
+    pid.initialize(
+      kp, ki, kd,
+      std::numeric_limits<double>::infinity(),
+      -std::numeric_limits<double>::infinity(), antiwindup_strat);
+  }
+
+  return are_pids_set;
+}
+
 std::vector<hardware_interface::StateInterface> MujocoSystemInterface::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> new_state_interfaces;
@@ -728,7 +789,7 @@ std::vector<hardware_interface::CommandInterface> MujocoSystemInterface::export_
 {
   std::vector<hardware_interface::CommandInterface> new_command_interfaces;
 
-  // // Joint command interfaces
+  // Joint command interfaces
   for (auto& joint : joint_states_)
   {
     // Add command interfaces for joint hardware.
@@ -823,16 +884,32 @@ MujocoSystemInterface::perform_command_mode_switch(const std::vector<std::string
       joint_it->is_position_control_enabled = false;
       joint_it->is_velocity_control_enabled = false;
       joint_it->is_effort_control_enabled = false;
+      joint_it->is_position_pid_control_enabled = false;
+      joint_it->is_velocity_pid_control_enabled = false;
 
       if (interface_type == hardware_interface::HW_IF_POSITION)
       {
-        joint_it->is_position_control_enabled = true;
-        RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
-                    "Joint %s: position control enabled (velocity, effort disabled)", joint_name.c_str());
+        if(joint_it->is_pos_pid)
+        {
+          joint_it->is_position_pid_control_enabled = true;
+        }
+        else 
+        {
+          joint_it->is_position_control_enabled = true;
+        }
+         RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
+                      "Joint %s: position control enabled (velocity, effort disabled)", joint_name.c_str());
       }
       else if (interface_type == hardware_interface::HW_IF_VELOCITY)
       {
-        joint_it->is_velocity_control_enabled = true;
+        if(joint_it->is_vel_pid)
+        {
+          joint_it->is_velocity_pid_control_enabled = true;
+        }
+        else
+        {
+          joint_it->is_velocity_control_enabled = true;
+        }
         RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
                     "Joint %s: velocity control enabled (position, effort disabled)", joint_name.c_str());
       }
@@ -848,10 +925,12 @@ MujocoSystemInterface::perform_command_mode_switch(const std::vector<std::string
       if (interface_type == hardware_interface::HW_IF_POSITION)
       {
         joint_it->is_position_control_enabled = false;
+        joint_it->is_position_pid_control_enabled = false;
       }
       else if (interface_type == hardware_interface::HW_IF_VELOCITY)
       {
         joint_it->is_velocity_control_enabled = false;
+        joint_it->is_velocity_pid_control_enabled = false;
       }
       else if (interface_type == hardware_interface::HW_IF_EFFORT)
       {
@@ -921,7 +1000,7 @@ hardware_interface::return_type MujocoSystemInterface::read(const rclcpp::Time& 
 }
 
 hardware_interface::return_type MujocoSystemInterface::write(const rclcpp::Time& /*time*/,
-                                                             const rclcpp::Duration& /*period*/)
+                                                             const rclcpp::Duration &period)
 {
   // Update mimic joints
   for (auto& joint_state : joint_states_)
@@ -951,9 +1030,21 @@ hardware_interface::return_type MujocoSystemInterface::write(const rclcpp::Time&
     {
       mj_data_control_->ctrl[joint_state.mj_actuator_id] = joint_state.position_command;
     }
+    else if(joint_state.is_position_pid_control_enabled)
+    {
+      double error = joint_state.position_command - mj_data_->qpos[joint_state.mj_pos_adr];
+      mj_data_control_->qfrc_applied[joint_state.mj_vel_adr] =
+        joint_state.pos_pid.computeCommand(error, period.nanoseconds());
+    }
     else if (joint_state.is_velocity_control_enabled)
     {
       mj_data_control_->ctrl[joint_state.mj_actuator_id] = joint_state.velocity_command;
+    }
+    else if(joint_state.is_velocity_pid_control_enabled)
+    {
+      double error = joint_state.velocity_command - mj_data_->qvel[joint_state.mj_vel_adr];
+      mj_data_control_->qfrc_applied[joint_state.mj_vel_adr] =
+        joint_state.vel_pid.computeCommand(error, period.nanoseconds());
     }
     else if (joint_state.is_effort_control_enabled)
     {
@@ -967,6 +1058,7 @@ hardware_interface::return_type MujocoSystemInterface::write(const rclcpp::Time&
 void MujocoSystemInterface::register_joints(const hardware_interface::HardwareInfo& hardware_info)
 {
   joint_states_.resize(hardware_info.joints.size());
+  auto node = get_node();
 
   // Pull the name of the file to load for starting config, if present. We only override start position if that
   // parameter exists and it is not an empty string
@@ -1115,25 +1207,27 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       bool is_position_actuator = actuator_map[actuator_name].find("position")!= std::string::npos;
       bool is_velocity_actuator = actuator_map[actuator_name].find("velocity")!= std::string::npos;
       bool is_motor_actuator = actuator_map[actuator_name].find("motor")!= std::string::npos;
-      bool pid_exist=false;
 
       // If available, always default to position control at the start
       if (command_if.name.find(hardware_interface::HW_IF_POSITION) != std::string::npos)
       {
         if(is_velocity_actuator || is_motor_actuator)
         {
-          if(!pid_exist)
+          if(extractPIDFromParameters ("position", joint.name, last_joint_state.pos_pid, node)  && is_velocity_actuator)
+          {
+            last_joint_state.is_position_pid_control_enabled = true;
+            last_joint_state.is_pos_pid=true;
+          }
+          else if(extractPIDFromParameters ("position", joint.name, last_joint_state.pos_pid, node) && is_motor_actuator)
+          {
+            last_joint_state.is_position_pid_control_enabled = true;
+            last_joint_state.is_pos_pid=true;
+
+          }
+          else
           {
             RCLCPP_ERROR(rclcpp::get_logger("MujocoSystemInterface"), "Position command interface for the joint : %s is not supported with velocity or motor actuator", joint.name.c_str());
             continue;
-          }
-          else if(pid_exist && is_velocity_actuator)
-          {
-            last_joint_state.is_velocity_control_enabled = true;
-          }
-          else if(pid_exist && is_motor_actuator)
-          {
-            last_joint_state.is_effort_control_enabled = true;
           }
         }
         if(is_position_actuator)
@@ -1145,14 +1239,18 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       }
       else if (command_if.name.find(hardware_interface::HW_IF_VELOCITY) != std::string::npos)
       {
-        if(is_position_actuator || (is_motor_actuator && !pid_exist))
+        if(is_position_actuator || is_motor_actuator)
         {
-          RCLCPP_ERROR(rclcpp::get_logger("MujocoSystemInterface"), "Velocity command interface for the joint : %s is not supported with position or motor actuator",  joint.name.c_str());
-          continue;
-        }
-        if(is_motor_actuator && pid_exist)
-        {
-          last_joint_state.is_effort_control_enabled = true;
+          if(is_motor_actuator && extractPIDFromParameters ("velocity", joint.name, last_joint_state.vel_pid, node))
+          {
+            last_joint_state.is_velocity_pid_control_enabled = true;
+            last_joint_state.is_vel_pid=true;
+          }
+          else
+          {
+            RCLCPP_ERROR(rclcpp::get_logger("MujocoSystemInterface"), "Velocity command interface for the joint : %s is not supported with position or motor actuator",  joint.name.c_str());
+            continue;
+          }
         }
         if(is_velocity_actuator)
         {
@@ -1175,8 +1273,7 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         }
       }
     }
-
-     if(!last_joint_state.is_position_control_enabled && !last_joint_state.is_velocity_control_enabled && !last_joint_state.is_effort_control_enabled)
+     if(!last_joint_state.is_position_control_enabled && !last_joint_state.is_velocity_control_enabled && !last_joint_state.is_effort_control_enabled && !!last_joint_state.is_position_pid_control_enabled && !!last_joint_state.is_velocity_pid_control_enabled)
         throw std::runtime_error("Joint " + joint.name + " has unsupported actuator configuration");
 
     // When we override the start position, we set qpos from that file. Otherwise, we need to set it from initial
@@ -1427,6 +1524,7 @@ void MujocoSystemInterface::PhysicsLoop()
 
             // Copy data to the control
             mju_copy(mj_data_->ctrl, mj_data_control_->ctrl, mj_model_->nu);
+            mju_copy(mj_data_->qfrc_applied, mj_data_control_->qfrc_applied, mj_model_->nu);
             // run single step, let next iteration deal with timing
             mj_step(mj_model_, mj_data_);
 
@@ -1465,6 +1563,7 @@ void MujocoSystemInterface::PhysicsLoop()
 
               // Copy data to the control
               mju_copy(mj_data_->ctrl, mj_data_control_->ctrl, mj_model_->nu);
+              mju_copy(mj_data_->qfrc_applied, mj_data_control_->qfrc_applied, mj_model_->nu);
               // call mj_step
               mj_step(mj_model_, mj_data_);
 
