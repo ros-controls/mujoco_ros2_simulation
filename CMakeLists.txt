@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(controller_manager REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(control_toolbox REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -158,6 +159,7 @@ target_link_libraries(mujoco_ros2_simulation
   pluginlib::pluginlib
   rclcpp::rclcpp
   rclcpp_lifecycle::rclcpp_lifecycle
+  control_toolbox::control_toolbox
   sensor_msgs::sensor_msgs_library
   Eigen3::Eigen
   Threads::Threads
