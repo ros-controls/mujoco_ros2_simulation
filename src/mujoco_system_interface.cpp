@@ -222,13 +222,6 @@ bool extractPIDFromParameters(
   if (are_pids_set) {
     get_pid_entry("max_integral_error", max_integral_error);
     get_pid_entry("min_integral_error", min_integral_error);
-    RCLCPP_INFO_STREAM(
-      node->get_logger(),
-      "Setting kp = " << kp << "\t"
-                      << " ki = " << ki << "\t"
-                      << " kd = " << kd << "\t"
-                      << " max_integral_error = " << max_integral_error << "\t"
-                      << " min_integral_error = " << min_integral_error << " from node parameters");
     control_toolbox::AntiWindupStrategy antiwindup_strat;
     antiwindup_strat.set_type("none");
     antiwindup_strat.i_max = max_integral_error;
@@ -736,16 +729,17 @@ std::vector<hardware_interface::CommandInterface> MujocoSystemInterface::export_
       {
         if (command_if.name.find(hardware_interface::HW_IF_POSITION) != std::string::npos)
         {
-          new_command_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_POSITION, &joint.position_command);
+          if(joint.is_position_control_enabled || joint.is_position_pid_control_enabled)
+            new_command_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_POSITION, &joint.position_command);
         }
         else if (command_if.name.find(hardware_interface::HW_IF_VELOCITY) != std::string::npos)
         {
-          if(joint.actuator_type == ActuatorType::VELOCITY || joint.actuator_type == ActuatorType::MOTOR)
+          if(joint.is_velocity_control_enabled || joint.is_velocity_pid_control_enabled)
             new_command_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_VELOCITY, &joint.velocity_command);
         }
         else if (command_if.name == hardware_interface::HW_IF_EFFORT)
         {
-          if(joint.actuator_type == ActuatorType::MOTOR)
+          if(joint.is_effort_control_enabled)
             new_command_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_EFFORT, &joint.effort_command);
         }
       }
@@ -1160,6 +1154,11 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
           if(last_joint_state.has_pos_pid)
           {
             last_joint_state.is_position_pid_control_enabled = true;
+            double p, i, d, i_max, i_min;
+            last_joint_state.pos_pid.getGains(p, i, d, i_max, i_min);
+
+            RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Position control PID gains for joint %s : P=%.4f, I=%.4f, D=%.4f, Imax=%.4f, Imin=%.4f", joint.name.c_str(), p, i, d, i_max, i_min);
+
           }
           else
           {
@@ -1181,6 +1180,10 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
           if(last_joint_state.actuator_type == ActuatorType::MOTOR && last_joint_state.has_vel_pid)
           {
             last_joint_state.is_velocity_pid_control_enabled = true;
+            double p, i, d, i_max, i_min;
+            last_joint_state.vel_pid.getGains(p, i, d, i_max, i_min);
+
+            RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Velocity control PID gains for joint %s : P=%.4f, I=%.4f, D=%.4f, Imax=%.4f, Imin=%.4f", joint.name.c_str(), p, i, d, i_max, i_min);
           }
           else
           {
@@ -1211,9 +1214,8 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
     }
     if(!last_joint_state.is_position_control_enabled && !last_joint_state.is_velocity_control_enabled && !last_joint_state.is_effort_control_enabled && !last_joint_state.is_position_pid_control_enabled && !last_joint_state.is_velocity_pid_control_enabled)
     {
-      RCLCPP_ERROR(rclcpp::get_logger("MujocoSystemInterface"),
-               "Joint '%s' has an unsupported actuator configuration", joint.name.c_str());
-      // return hardware_interface::return_type::ERROR;
+      throw std::runtime_error(
+      std::string("Joint '") + joint.name + "' has an unsupported command interface for the specified MuJoCo actuator");
     }
 
     // When we override the start position, we set qpos from that file. Otherwise, we need to set it from initial
