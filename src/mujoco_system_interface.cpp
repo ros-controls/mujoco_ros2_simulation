@@ -1042,12 +1042,6 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
     mujoco_actuator_id = mujoco_actuator_id == -1 ? mj_name2id(mj_model_, mjtObj::mjOBJ_ACTUATOR, joint.name.c_str()) :
                                                     mujoco_actuator_id;
 
-    if (mujoco_actuator_id == -1)
-    {
-      // This isn't a failure the joint just won't be controllable
-      RCLCPP_WARN_STREAM(rclcpp::get_logger("MujocoSystemInterface"), "No actuator found for joint: " << joint.name);
-    }
-
     // Add to the joint hw information map
     joint_hw_info_.insert(std::make_pair(joint.name, joint));
 
@@ -1119,18 +1113,21 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         last_joint_state.effort = get_initial_value(state_if);
       }
     }
-      // 
-    if (mujoco_actuator_id < 0)
+
+    if (mujoco_actuator_id == -1)
+    {
+      // This isn't a failure the joint just won't be controllable
+      RCLCPP_WARN_STREAM(rclcpp::get_logger("MujocoSystemInterface"), "No actuator found for joint: " << joint.name);
       continue;
+    }
 
     int biastype = mj_model_->actuator_biastype[mujoco_actuator_id];
-    int gaintype = mj_model_->actuator_gaintype[mujoco_actuator_id];
-    const int NBias = 10;
+    const int NBias = 10; 
     const mjtNum* biasprm = mj_model_->actuator_biasprm + mujoco_actuator_id * NBias;
 
     if (biastype == mjBIAS_NONE)
       last_joint_state.actuator_type = ActuatorType::MOTOR;
-    else if (biastype == mjBIAS_AFFINE && biasprm[1] != 0 && biasprm[2] != 0)
+    else if (biastype == mjBIAS_AFFINE && biasprm[1] != 0)
       last_joint_state.actuator_type = ActuatorType::POSITION;
     else if (biastype == mjBIAS_AFFINE && biasprm[1] == 0 && biasprm[2] != 0)
       last_joint_state.actuator_type = ActuatorType::VELOCITY;
