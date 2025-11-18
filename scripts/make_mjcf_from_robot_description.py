@@ -1251,6 +1251,13 @@ def main(args=None):
 
     convert_stl_to_obj = parsed_args.convert_stl_to_obj
 
+    # Part inputs data from urdf
+    if not parsed_args.mujoco_inputs:
+        parsed_args.mujoco_inputs= parsed_args.urdf
+
+    raw_inputs, processed_inputs = parse_inputs_xml(parsed_args.mujoco_inputs)
+    decompose_dict, cameras_dict, modify_element_dict, lidar_dict = get_processed_mujoco_inputs(processed_inputs)
+
     if parsed_args.save_only:
         output_filepath = os.path.join(parsed_args.output, "")
     else:
@@ -1269,23 +1276,16 @@ def main(args=None):
     # not sure if this is the best move...
     xml_data = remove_tag(xml_data, "collision")
 
+    xml_data = replace_package_names(xml_data)
+    mesh_info_dict = extract_mesh_info(xml_data)
+    xml_data = convert_to_objs(mesh_info_dict, output_filepath, xml_data, convert_stl_to_obj, decompose_dict)
+
     print("writing data to robot_description_formatted.urdf")
     robot_description_filename = "robot_description_formatted.urdf"
     with open(output_filepath + "robot_description_formatted.urdf", "w") as file:
         # Remove extra newlines that minidom adds after each tag
         xml_data = "\n".join([line for line in xml_data.splitlines() if line.strip()])
         file.write(xml_data)
-
-    # Part inputs data from urdf
-    if not parsed_args.mujoco_inputs:
-        parsed_args.mujoco_inputs= parsed_args.urdf
-
-    raw_inputs, processed_inputs = parse_inputs_xml(parsed_args.mujoco_inputs)
-    decompose_dict, cameras_dict, modify_element_dict, lidar_dict = get_processed_mujoco_inputs(processed_inputs)
-
-    xml_data = replace_package_names(xml_data)
-    mesh_info_dict = extract_mesh_info(xml_data)
-    xml_data = convert_to_objs(mesh_info_dict, output_filepath, xml_data, convert_stl_to_obj, decompose_dict)
 
     model = mujoco.MjModel.from_xml_path(f"{output_filepath}{robot_description_filename}")
     mujoco.mj_saveLastXML(f"{output_filepath}mujoco_description.xml", model)
