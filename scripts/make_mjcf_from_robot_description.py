@@ -628,25 +628,46 @@ def parse_inputs_xml(filename=None):
 
     dom = minidom.parse(filename)
     root = dom.documentElement
-
-    # We only parse the direct children of the root node, which should be called
-    # "mujoco_defaults".
-    if root.tagName != "mujoco_inputs":
-        raise ValueError(f"Root tag in defaults xml must be 'mujoco_inputs', not {root.tagName}")
-
+    
     raw_inputs = None
     processed_inputs = None
 
-    for child in root.childNodes:
-        if child.nodeType != child.ELEMENT_NODE:
-            continue
+    # Case 1: The file itself is mujoco_inputs.xml
+    if root.tagName == "mujoco_inputs":
+        for child in root.childNodes:
+            if child.nodeType != child.ELEMENT_NODE:
+                continue
+            if child.tagName == "raw_inputs":
+                raw_inputs = child
+            elif child.tagName == "processed_inputs":
+                processed_inputs = child
+        return raw_inputs, processed_inputs
 
-        if child.tagName == "raw_inputs":
-            raw_inputs = child
-        elif child.tagName == "processed_inputs":
-            processed_inputs = child
 
-    return raw_inputs, processed_inputs
+    # Case 2: It is a URDF with a <mujoco_inputs> block
+    if root.tagName == "robot":
+        mujoco_inputs_node = None
+
+        # find <mujoco_inputs>
+        for child in root.childNodes:
+            if child.nodeType == child.ELEMENT_NODE and child.tagName == "mujoco_inputs":
+                mujoco_inputs_node = child
+                break
+
+        if mujoco_inputs_node is None:
+            # URDF without mujoco_inputs → allowed
+            return None, None
+
+        # parse children of <mujoco_inputs>
+        for child in mujoco_inputs_node.childNodes:
+            if child.nodeType != child.ELEMENT_NODE:
+                continue
+            if child.tagName == "raw_inputs":
+                raw_inputs = child
+            elif child.tagName == "processed_inputs":
+                processed_inputs = child
+
+        return raw_inputs, processed_inputs
 
 
 def fix_free_joint(dom, urdf, joint_name="floating_base_joint"):
@@ -1082,6 +1103,49 @@ def get_urdf_transforms(urdf_string):
 
     return results
 
+def publish_model_on_topic(output_filepath, temp_dir, args=None):
+
+    import rclpy
+    from rclpy.node import Node
+    from std_msgs.msg import String
+    from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy
+
+     # --- Node ROS2 for model publishing MJCF ---
+    class MjcfPublisher(Node):
+        def __init__(self, mjcf_path):
+            super().__init__('mjcf_publisher')
+
+            qos_profile = QoSProfile(
+            depth=1,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
+            )
+
+            self.publisher_ = self.create_publisher(String, 'mujoco_robot_description', qos_profile)
+            self.timer = self.create_timer(1.0, self.publish_mjcf)
+            self.mjcf_path = mjcf_path
+
+        def publish_mjcf(self):
+            with open(self.mjcf_path, 'r') as f:
+                xml_content = f.read()
+            msg = String()
+            msg.data = xml_content
+            self.publisher_.publish(msg)
+
+    rclpy.init(args=args)
+    mjcf_path = os.path.join(output_filepath, "mujoco_description_formatted.xml")
+    mjcf_node = MjcfPublisher(mjcf_path)
+
+    try:
+        rclpy.spin(mjcf_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        mjcf_node.destroy_node()
+        rclpy.shutdown()
+        if temp_dir is not None:
+            temp_dir.cleanup()
+            print("Temporary directory cleaned up.")
 
 def add_urdf_free_joint(urdf):
     """
@@ -1158,6 +1222,11 @@ def main(args=None):
     parser.add_argument("-o", "--output", default="mjcf_data", help="Generated output path")
     parser.add_argument("-c", "--convert_stl_to_obj", action="store_true", help="If we should convert .stls to .objs")
     parser.add_argument(
+        "-s", "--save_only",
+        action="store_true",
+        help="Save the generated files permanently. Without this flag a temporary directory is used."
+    )
+    parser.add_argument(
         "-f",
         "--add_free_joint",
         action="store_true",
@@ -1182,12 +1251,12 @@ def main(args=None):
 
     convert_stl_to_obj = parsed_args.convert_stl_to_obj
 
-    # Part inputs data
-    raw_inputs, processed_inputs = parse_inputs_xml(parsed_args.mujoco_inputs)
-    decompose_dict, cameras_dict, modify_element_dict, lidar_dict = get_processed_mujoco_inputs(processed_inputs)
-
-    # Grab the output directory and ensure it ends with '/'
-    output_filepath = os.path.join(parsed_args.output, "")
+    if parsed_args.save_only:
+        output_filepath = os.path.join(parsed_args.output, "")
+    else:
+        temp_dir = tempfile.TemporaryDirectory()
+        output_filepath = os.path.join(temp_dir.name, "")
+        print(f"Using temporary directory: {output_filepath}")
 
     # Add a free joint to the urdf
     if request_add_free_joint:
@@ -1200,16 +1269,23 @@ def main(args=None):
     # not sure if this is the best move...
     xml_data = remove_tag(xml_data, "collision")
 
-    xml_data = replace_package_names(xml_data)
-    mesh_info_dict = extract_mesh_info(xml_data)
-    xml_data = convert_to_objs(mesh_info_dict, output_filepath, xml_data, convert_stl_to_obj, decompose_dict)
-
     print("writing data to robot_description_formatted.urdf")
     robot_description_filename = "robot_description_formatted.urdf"
     with open(output_filepath + "robot_description_formatted.urdf", "w") as file:
         # Remove extra newlines that minidom adds after each tag
         xml_data = "\n".join([line for line in xml_data.splitlines() if line.strip()])
         file.write(xml_data)
+
+    # Part inputs data from urdf
+    if not parsed_args.mujoco_inputs:
+        parsed_args.mujoco_inputs= parsed_args.urdf
+
+    raw_inputs, processed_inputs = parse_inputs_xml(parsed_args.mujoco_inputs)
+    decompose_dict, cameras_dict, modify_element_dict, lidar_dict = get_processed_mujoco_inputs(processed_inputs)
+
+    xml_data = replace_package_names(xml_data)
+    mesh_info_dict = extract_mesh_info(xml_data)
+    xml_data = convert_to_objs(mesh_info_dict, output_filepath, xml_data, convert_stl_to_obj, decompose_dict)
 
     model = mujoco.MjModel.from_xml_path(f"{output_filepath}{robot_description_filename}")
     mujoco.mj_saveLastXML(f"{output_filepath}mujoco_description.xml", model)
@@ -1228,6 +1304,9 @@ def main(args=None):
     )
 
     shutil.copy2(f'{get_package_share_directory("mujoco_ros2_simulation")}/resources/scene.xml', output_filepath)
+   
+    if not parsed_args.save_only:
+        publish_model_on_topic(output_filepath, temp_dir, args)
 
 
 if __name__ == "__main__":
