@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <future>
 #include <iostream>
 #include <memory>
@@ -453,8 +454,38 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
 
   // Load the model and data prior to hw registration and starting the physics thread
   sim_->LoadMessage(model_path_.c_str());
-  auto node = get_node();
-  mj_model_ = LoadModel(model_path_.c_str(), *sim_, node);
+
+  // Construct and start the ROS node spinning
+  /// The PIDs config file
+  const auto pids_config_file = get_parameter("pids_config_file");
+  rclcpp::NodeOptions node_options;
+  node_options.append_parameter_override("use_sim_time", rclcpp::ParameterValue(true));
+  node_options.allow_undeclared_parameters(true);
+  node_options.automatically_declare_parameters_from_overrides(true);
+  if (pids_config_file.has_value())
+  {
+    // Check if the file exists
+    const std::filesystem::path path_to_file(pids_config_file.value());
+    if (!std::filesystem::exists(path_to_file))
+    {
+      RCLCPP_FATAL(rclcpp::get_logger("MujocoSystemInterface"), "PID config file '%s' does not exist!",
+                   pids_config_file->c_str());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("MujocoSystemInterface"),
+                       "Loading PID config from file: " << pids_config_file.value());
+    auto node_options_arguments = node_options.arguments();
+    node_options_arguments.push_back(RCL_ROS_ARGS_FLAG);
+    node_options_arguments.push_back(RCL_PARAM_FILE_FLAG);
+    node_options_arguments.push_back(pids_config_file.value());
+    node_options.arguments(node_options_arguments);
+  }
+  executor_ = std::make_unique<rclcpp::executors::MultiThreadedExecutor>();
+  mujoco_node_ = std::make_shared<rclcpp::Node>("mujoco_node", node_options);
+  executor_->add_node(mujoco_node_);
+  executor_thread_ = std::thread([this]() { executor_->spin(); });
+
+  mj_model_ = LoadModel(model_path_.c_str(), *sim_, mujoco_node_);
   if (!mj_model_)
   {
     RCLCPP_FATAL(rclcpp::get_logger("MujocoSystemInterface"), "Mujoco failed to load '%s'", model_path_.c_str());
@@ -476,12 +507,6 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
   register_joints(get_hardware_info());
   register_sensors(get_hardware_info());
   set_initial_pose();
-
-  // Construct and start the ROS node spinning
-  executor_ = std::make_unique<rclcpp::executors::MultiThreadedExecutor>();
-  mujoco_node_ = std::make_shared<rclcpp::Node>("mujoco_node");
-  executor_->add_node(mujoco_node_);
-  executor_thread_ = std::thread([this]() { executor_->spin(); });
 
   // Time publisher will be pushed from the physics_thread_
   clock_publisher_ = mujoco_node_->create_publisher<rosgraph_msgs::msg::Clock>("/clock", 1);
@@ -930,7 +955,6 @@ hardware_interface::return_type MujocoSystemInterface::write(const rclcpp::Time&
 void MujocoSystemInterface::register_joints(const hardware_interface::HardwareInfo& hardware_info)
 {
   joint_states_.resize(hardware_info.joints.size());
-  auto node = get_node();
 
   // Pull the name of the file to load for starting config, if present. We only override start position if that
   // parameter exists and it is not an empty string
@@ -1095,11 +1119,11 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
     }
 
     last_joint_state.pos_pid =
-        std::make_shared<control_toolbox::PidROS>(get_node(), "pid_gains.position." + joint.name, "");
+        std::make_shared<control_toolbox::PidROS>(mujoco_node_, "pid_gains.position." + joint.name, "");
     last_joint_state.has_pos_pid = last_joint_state.pos_pid->initialize_from_ros_parameters();
 
     last_joint_state.vel_pid =
-        std::make_shared<control_toolbox::PidROS>(get_node(), "pid_gains.velocity." + joint.name, "");
+        std::make_shared<control_toolbox::PidROS>(mujoco_node_, "pid_gains.velocity." + joint.name, "");
     last_joint_state.has_vel_pid = last_joint_state.vel_pid->initialize_from_ros_parameters();
 
     // command interfaces

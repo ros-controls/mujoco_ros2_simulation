@@ -133,6 +133,8 @@
       <plugin>mujoco_ros2_simulation/MujocoSystemInterface</plugin>
       <param name="mujoco_model">$(find mujoco_ros2_simulation)/test_resources/test_pid/scene_pid.xml</param>
 
+      <param name="pids_config_file">$(find mujoco_ros2_simulation)/config/mujoco_pid.yaml</param>
+
       <!-- Override the slowdown settings in the Simulate App and run at 3x speed -->
       <param name="sim_speed_factor">3.0</param>
 

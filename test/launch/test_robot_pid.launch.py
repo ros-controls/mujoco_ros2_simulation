@@ -46,7 +46,7 @@ def generate_launch_description():
     robot_description = {"robot_description": ParameterValue(value=robot_description_content, value_type=str)}
 
     controller_parameters_pid = ParameterFile(
-        PathJoinSubstitution([FindPackageShare("mujoco_ros2_simulation"), "config", "controllers_pid.yaml"]),
+        PathJoinSubstitution([FindPackageShare("mujoco_ros2_simulation"), "config", "controllers.yaml"]),
     )
 
     robot_state_publisher_node = Node(
@@ -67,6 +67,7 @@ def generate_launch_description():
             {"use_sim_time": True},
             controller_parameters_pid,
         ],
+        emulate_tty=True,
     )
 
     spawn_joint_state_broadcaster = Node(
