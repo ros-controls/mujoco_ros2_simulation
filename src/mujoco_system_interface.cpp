@@ -300,17 +300,17 @@ MujocoSystemInterface::~MujocoSystemInterface()
   }
 }
 
-hardware_interface::CallbackReturn MujocoSystemInterface::on_init(const hardware_interface::HardwareInfo& info)
+hardware_interface::CallbackReturn
+MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterfaceParams& params)
 {
-  if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS)
+  if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS)
   {
     return hardware_interface::CallbackReturn::ERROR;
   }
-  system_info_ = info;
 
   // Helper function to get parameters in hardware info.
   auto get_parameter = [&](const std::string& key) -> std::optional<std::string> {
-    if (auto it = info.hardware_parameters.find(key); it != info.hardware_parameters.end())
+    if (auto it = get_hardware_info().hardware_parameters.find(key); it != get_hardware_info().hardware_parameters.end())
     {
       return it->second;
     }
@@ -407,8 +407,8 @@ hardware_interface::CallbackReturn MujocoSystemInterface::on_init(const hardware
   }
 
   // Pull joint and sensor information
-  register_joints(info);
-  register_sensors(info);
+  register_joints(get_hardware_info());
+  register_sensors(get_hardware_info());
   set_initial_pose();
 
   // Construct and start the ROS node spinning
@@ -423,12 +423,12 @@ hardware_interface::CallbackReturn MujocoSystemInterface::on_init(const hardware
   // Ready cameras
   RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Initializing cameras...");
   cameras_ = std::make_unique<MujocoCameras>(mujoco_node_, sim_mutex_, mj_data_, mj_model_, camera_publish_rate);
-  cameras_->register_cameras(info);
+  cameras_->register_cameras(get_hardware_info());
 
   // Configure Lidar sensors
   RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Initializing lidar...");
   lidar_sensors_ = std::make_unique<MujocoLidar>(mujoco_node_, sim_mutex_, mj_data_, mj_model_, lidar_publish_rate);
-  if (!lidar_sensors_->register_lidar(info))
+  if (!lidar_sensors_->register_lidar(get_hardware_info()))
   {
     RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Failed to initialize lidar, exiting...");
     return hardware_interface::CallbackReturn::FAILURE;
