@@ -1215,7 +1215,7 @@ void MujocoSystemInterface::publish_clock()
 void MujocoSystemInterface::get_model(mjModel*& dest)
 {
   const std::unique_lock<std::recursive_mutex> lock(*sim_mutex_);
-  mj_copyModel(dest, mj_model_);
+  dest = mj_copyModel(dest, mj_model_);
 }
 
 void MujocoSystemInterface::get_data(mjData*& dest)
