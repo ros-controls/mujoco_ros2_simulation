@@ -35,11 +35,8 @@
 #include <string>
 #include <thread>
 
-<<<<<<< Updated upstream
-=======
 #include <tinyxml2.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
->>>>>>> Stashed changes
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
