@@ -191,7 +191,7 @@ const char* Diverged(int disableflags, const mjData* d)
 mjModel* loadModelFromFile(const char* file, mj::Simulate& sim)
 {
   mjModel* mnew = 0;
-  
+
   // this copy is needed so that the mju::strlen call below compiles
   char filename[mj::Simulate::kMaxFilenameLength];
   mju::strcpy_arr(filename, file);
@@ -200,7 +200,7 @@ mjModel* loadModelFromFile(const char* file, mj::Simulate& sim)
   char loadError[kErrorLength] = "";
   auto load_start = mj::Simulate::Clock::now();
   if (mju::strlen_arr(filename) > 4 && !std::strncmp(filename + mju::strlen_arr(filename) - 4, ".mjb",
-                                                      mju::sizeof_arr(filename) - mju::strlen_arr(filename) + 4))
+                                                     mju::sizeof_arr(filename) - mju::strlen_arr(filename) + 4))
   {
     mnew = mj_loadModel(filename, nullptr);
     if (!mnew)
@@ -248,7 +248,6 @@ mjModel* loadModelFromFile(const char* file, mj::Simulate& sim)
 
   mju::strcpy_arr(sim.load_error, loadError);
   return mnew;
-  
 }
 
 mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node)
@@ -259,7 +258,7 @@ mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node)
   rclcpp::QoS qos_profile(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
   qos_profile.reliable().transient_local().keep_last(1);
   RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Trying to get the mujoco model from topic");
-  
+
   // Try to get mujoco_model via topic
   auto mujoco_model_sub = node->create_subscription<std_msgs::msg::String>(
       "/mujoco_robot_description", qos_profile, [&](const std_msgs::msg::String::SharedPtr msg) {
@@ -273,24 +272,23 @@ mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node)
 
   while (robot_description.empty() && rclcpp::ok())
   {
-      auto now = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
 
-      if (now - last_print >= std::chrono::seconds(1))
-      {
-          RCLCPP_INFO(node->get_logger(),
-                      "Waiting for /mujoco_robot_description...");
-          last_print = now;
-      }
+    if (now - last_print >= std::chrono::seconds(1))
+    {
+      RCLCPP_INFO(node->get_logger(), "Waiting for /mujoco_robot_description...");
+      last_print = now;
+    }
 
-      if (now - start > timeout)
-      {
-          RCLCPP_WARN(node->get_logger(), "Timeout waiting for /mujoco_robot_description topic.");
-          break;
-      }
+    if (now - start > timeout)
+    {
+      RCLCPP_WARN(node->get_logger(), "Timeout waiting for /mujoco_robot_description topic.");
+      break;
+    }
 
-      rclcpp::sleep_for(std::chrono::milliseconds(200));
+    rclcpp::sleep_for(std::chrono::milliseconds(200));
   }
-  
+
   if (!robot_description.empty())
   {
     // Load Mujoco model
@@ -330,7 +328,6 @@ mjModel* LoadModel(const char* file, mj::Simulate& sim, rclcpp::Node::SharedPtr 
   }
   // Try to get the mujoco model from topic
   return loadModelFromTopic(node);
-  
 }
 
 ActuatorType getActuatorType(const mjModel* mj_model, int mujoco_actuator_id)
@@ -1147,12 +1144,12 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       continue;
     }
 
-    // Determine the MuJoCo actuator type 
+    // Determine the MuJoCo actuator type
     last_joint_state.actuator_type = getActuatorType(mj_model_, mujoco_actuator_id);
-    if(last_joint_state.actuator_type == ActuatorType::CUSTOM)
+    if (last_joint_state.actuator_type == ActuatorType::CUSTOM)
     {
       RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
-                "Custom MuJoCo actuator for the joint : %s , using all command interfaces", joint.name.c_str());
+                  "Custom MuJoCo actuator for the joint : %s , using all command interfaces", joint.name.c_str());
     }
 
     // command interfaces
@@ -1166,7 +1163,7 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       {
         // Position command interface
         // Direct control for position actuators; position PID required for velocity, motor, or custom actuators.
-        
+
         if (last_joint_state.actuator_type == ActuatorType::VELOCITY ||
             last_joint_state.actuator_type == ActuatorType::MOTOR ||
             last_joint_state.actuator_type == ActuatorType::CUSTOM)

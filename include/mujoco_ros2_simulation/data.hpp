@@ -31,7 +31,7 @@ namespace mujoco_ros2_simulation
 
 /**
  * Maps to MuJoCo actuator types:
- *  - MOTOR for MuJoCo motor actuator  
+ *  - MOTOR for MuJoCo motor actuator
  *  - POSITION for MuJoCo position actuator
  *  - VELOCITY for MuJoCo velocity actuator
  *  - CUSTOM  for MuJoCo general actuator
@@ -57,7 +57,7 @@ struct JointState
   double effort;
   std::shared_ptr<control_toolbox::PidROS> pos_pid{ nullptr };
   std::shared_ptr<control_toolbox::PidROS> vel_pid{ nullptr };
-  ActuatorType actuator_type{ActuatorType::UNKNOWN };
+  ActuatorType actuator_type{ ActuatorType::UNKNOWN };
   double position_command;
   double velocity_command;
   double effort_command;
