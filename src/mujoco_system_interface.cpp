@@ -188,25 +188,6 @@ const char* Diverged(int disableflags, const mjData* d)
   return nullptr;
 }
 
-mjModel* LoadModel(const char* file, mj::Simulate& sim, rclcpp::Node::SharedPtr node)
-{
-  // Try to get the mujoco model from URDF.
-  // If it is not available, create a subscription and listen for the model on a topic.
-
-  // this copy is needed so that the mju::strlen call below compiles
-  char filename[mj::Simulate::kMaxFilenameLength];
-  mju::strcpy_arr(filename, file);
-
-  // load model from path if the filename is not empty
-  if (filename[0])
-  {
-    return loadModelFromFile(file, sim);
-  }
-  // Try to get the mujoco model from topic
-  return loadModelFromTopic(node, sim);
-  
-}
-
 mjModel* loadModelFromFile(const char* file, mj::Simulate& sim)
 {
   mjModel* mnew = 0;
@@ -326,6 +307,54 @@ mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node, mj::Simulate& sim)
     RCLCPP_INFO(node->get_logger(), "Model geom count: %d", mnew->ngeom);
   }
   return mnew;
+}
+
+mjModel* LoadModel(const char* file, mj::Simulate& sim, rclcpp::Node::SharedPtr node)
+{
+  // Try to get the mujoco model from URDF.
+  // If it is not available, create a subscription and listen for the model on a topic.
+
+  // this copy is needed so that the mju::strlen call below compiles
+  char filename[mj::Simulate::kMaxFilenameLength];
+  mju::strcpy_arr(filename, file);
+
+  // load model from path if the filename is not empty
+  if (filename[0])
+  {
+    return loadModelFromFile(file, sim);
+  }
+  // Try to get the mujoco model from topic
+  return loadModelFromTopic(node, sim);
+  
+}
+
+ActuatorType getActuatorType(const mjModel* mj_model, int mujoco_actuator_id)
+{
+  // Returns the MuJoCo actuator type based on the actuator's bias settings.
+  ActuatorType actuator_type = ActuatorType::UNKNOWN;
+  int biastype = mj_model->actuator_biastype[mujoco_actuator_id];
+  const int NBias = 10;
+  const mjtNum* biasprm = mj_model->actuator_biasprm + mujoco_actuator_id * NBias;
+
+  if (biastype == mjBIAS_NONE)
+  {
+    actuator_type = ActuatorType::MOTOR;
+  }
+  else if (biastype == mjBIAS_AFFINE && biasprm[1] != 0)
+  {
+    actuator_type = ActuatorType::POSITION;
+  }
+  else if (biastype == mjBIAS_AFFINE && biasprm[1] == 0 && biasprm[2] != 0)
+  {
+    actuator_type = ActuatorType::VELOCITY;
+  }
+  else
+  {
+    // If none of the standard bias patterns match, classify as a custom actuator
+    actuator_type = ActuatorType::CUSTOM;
+  }
+
+  return actuator_type;
 }
 
 MujocoSystemInterface::MujocoSystemInterface() = default;
@@ -1113,27 +1142,12 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       continue;
     }
 
-    int biastype = mj_model_->actuator_biastype[mujoco_actuator_id];
-    const int NBias = 10;
-    const mjtNum* biasprm = mj_model_->actuator_biasprm + mujoco_actuator_id * NBias;
-
-    if (biastype == mjBIAS_NONE)
+    // Determine the MuJoCo actuator type 
+    last_joint_state.actuator_type = getActuatorType(mj_model_, mujoco_actuator_id);
+    if(last_joint_state.actuator_type == ActuatorType::CUSTOM)
     {
-      last_joint_state.actuator_type = ActuatorType::MOTOR;
-    }
-    else if (biastype == mjBIAS_AFFINE && biasprm[1] != 0)
-    {
-      last_joint_state.actuator_type = ActuatorType::POSITION;
-    }
-    else if (biastype == mjBIAS_AFFINE && biasprm[1] == 0 && biasprm[2] != 0)
-    {
-      last_joint_state.actuator_type = ActuatorType::VELOCITY;
-    }
-    else
-    {
-      last_joint_state.actuator_type = ActuatorType::CUSTOM;
       RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
-                  "Custom MuJoCo actuator for the joint : %s , using all command interfaces", joint.name.c_str());
+                "Custom MuJoCo actuator for the joint : %s , using all command interfaces", joint.name.c_str());
     }
 
     // command interfaces

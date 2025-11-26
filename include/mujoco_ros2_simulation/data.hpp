@@ -39,6 +39,7 @@ namespace mujoco_ros2_simulation
 
 enum class ActuatorType
 {
+  UNKNOWN,
   MOTOR,
   POSITION,
   VELOCITY,
@@ -56,7 +57,7 @@ struct JointState
   double effort;
   std::shared_ptr<control_toolbox::PidROS> pos_pid{ nullptr };
   std::shared_ptr<control_toolbox::PidROS> vel_pid{ nullptr };
-  ActuatorType actuator_type;
+  ActuatorType actuator_type{ActuatorType::UNKNOWN };
   double position_command;
   double velocity_command;
   double effort_command;
