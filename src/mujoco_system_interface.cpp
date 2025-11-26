@@ -1159,6 +1159,9 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       // If available, always default to position control at the start
       if (command_if.name.find(hardware_interface::HW_IF_POSITION) != std::string::npos)
       {
+        // Position command interface
+        // Direct control for position actuators; position PID required for velocity, motor, or custom actuators.
+        
         if (last_joint_state.actuator_type == ActuatorType::VELOCITY ||
             last_joint_state.actuator_type == ActuatorType::MOTOR ||
             last_joint_state.actuator_type == ActuatorType::CUSTOM)
@@ -1193,6 +1196,7 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         }
         else if (last_joint_state.actuator_type == ActuatorType::POSITION)
         {
+          // Direct position control enabled for position actuator
           last_joint_state.is_position_control_enabled = true;
           last_joint_state.position_command =
               should_override_start_position ? mj_data_->ctrl[joint_state.mj_actuator_id] : last_joint_state.position;
@@ -1200,6 +1204,8 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       }
       else if (command_if.name.find(hardware_interface::HW_IF_VELOCITY) != std::string::npos)
       {
+        // Velocity command interface:
+        // Direct control for velocity actuators; velocity PID required for motor or custom actuators.
         if (last_joint_state.actuator_type == ActuatorType::POSITION)
         {
           RCLCPP_ERROR(rclcpp::get_logger("MujocoSystemInterface"),
@@ -1209,6 +1215,7 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         }
         if (last_joint_state.actuator_type == ActuatorType::VELOCITY)
         {
+          // Direct velocity control enabled for velocity actuator
           last_joint_state.is_velocity_control_enabled = true;
           last_joint_state.velocity_command =
               should_override_start_position ? mj_data_->ctrl[joint_state.mj_actuator_id] : last_joint_state.velocity;
@@ -1247,6 +1254,8 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       }
       else if (command_if.name.find(hardware_interface::HW_IF_EFFORT) != std::string::npos)
       {
+        // Effort command interface:
+        // Direct control for effort actuators; not supported for position or velocity actuators.
         if (last_joint_state.actuator_type == ActuatorType::POSITION ||
             last_joint_state.actuator_type == ActuatorType::VELOCITY)
         {
@@ -1258,6 +1267,7 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         }
         else
         {
+          // Direct effort control enabled for MOTOR or CUSTOM actuator
           last_joint_state.is_effort_control_enabled = true;
           last_joint_state.effort_command =
               should_override_start_position ? mj_data_->ctrl[joint_state.mj_actuator_id] : last_joint_state.effort;

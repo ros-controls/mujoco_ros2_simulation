@@ -115,9 +115,12 @@ The hardware interface _should_ then be compatible with `humble`, `jazzy`, and `
 ### Joints
 
 Joints in the ros2_control interface are mapped to actuators defined in the MJCF.
-For now, we rely on Mujoco's PD level `ctrl` input for all actuator control.
+The system supports different joint control modes based on the actuator type and available command interfaces. 
+We rely on MuJoCo's PD-level ctrl input for direct position, velocity, or effort control. 
+For velocity, motor, or custom actuators, a position or velocity PID is created if specified using ROS parameters to enable accurate control. 
+Incompatible actuator-interface combinations trigger an error.
 Refer to Mujoco's [actuation model](https://mujoco.readthedocs.io/en/stable/computation/index.html#geactuation) for more information.
-Of note, only one type of actuator per-joint can be controllable at a time, and the type CANNOT be switched during runtime (ie, switching from position to effort control is not supported).
+Of note, only one type of MuJoCo actuator per-joint can be controllable at a time, and the type CANNOT be switched during runtime (ie, switching from position to motor actuator is not supported). However, the active command interface can be switched dynamically, allowing control to shift between position, velocity, or effort as supported by the actuator type.
 Users are required to manually adjust actuator types and command interfaces to ensure that they are compatible.
 
 For example a position controlled joint on the mujoco
