@@ -251,14 +251,14 @@ mjModel* loadModelFromFile(const char* file, mj::Simulate& sim)
   
 }
 
-mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node, mj::Simulate& sim)
+mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node)
 {
   mjModel* mnew = 0;
   std::string robot_description;
 
   rclcpp::QoS qos_profile(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
   qos_profile.reliable().transient_local().keep_last(1);
-  RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Trying to get the mujoco model from topic.");
+  RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"), "Trying to get the mujoco model from topic");
   
   // Try to get mujoco_model via topic
   auto mujoco_model_sub = node->create_subscription<std_msgs::msg::String>(
@@ -267,25 +267,30 @@ mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node, mj::Simulate& sim)
           robot_description = msg->data;
       });
 
-  const auto start = node->now();
-  const auto timeout = rclcpp::Duration::from_seconds(5.0);
+  auto start = std::chrono::steady_clock::now();
   auto last_print = start;
+  auto timeout = std::chrono::seconds(5);
 
   while (robot_description.empty() && rclcpp::ok())
   {
-    if (node->now() - last_print >= rclcpp::Duration::from_seconds(1.0))
-    {
-      RCLCPP_INFO(node->get_logger(), "Waiting for /mujoco_robot_description...");
-      last_print = node->now();
-    }
+      auto now = std::chrono::steady_clock::now();
 
-    if (node->now() - start > timeout)
-    {
-      RCLCPP_WARN(node->get_logger(), "Timeout waiting for robot_description_mujoco topic.");
-      break;
-    }
-    rclcpp::sleep_for(std::chrono::milliseconds(200));
+      if (now - last_print >= std::chrono::seconds(1))
+      {
+          RCLCPP_INFO(node->get_logger(),
+                      "Waiting for /mujoco_robot_description...");
+          last_print = now;
+      }
+
+      if (now - start > timeout)
+      {
+          RCLCPP_WARN(node->get_logger(), "Timeout waiting for /mujoco_robot_description topic.");
+          break;
+      }
+
+      rclcpp::sleep_for(std::chrono::milliseconds(200));
   }
+  
   if (!robot_description.empty())
   {
     // Load Mujoco model
@@ -298,9 +303,9 @@ mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node, mj::Simulate& sim)
     if (!mnew)
     {
       const char* myerr = mjs_getError(spec);
-      mj_deleteSpec(spec);
       RCLCPP_INFO(node->get_logger(), "Error %s", myerr);
       RCLCPP_FATAL(node->get_logger(), "Failed to compile MuJoCo model: %s", error);
+      mj_deleteSpec(spec);
     }
     mj_deleteSpec(spec);
     RCLCPP_INFO(node->get_logger(), "Model body count: %d", mnew->nbody);
@@ -324,7 +329,7 @@ mjModel* LoadModel(const char* file, mj::Simulate& sim, rclcpp::Node::SharedPtr 
     return loadModelFromFile(file, sim);
   }
   // Try to get the mujoco model from topic
-  return loadModelFromTopic(node, sim);
+  return loadModelFromTopic(node);
   
 }
 
@@ -535,7 +540,7 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
   mj_model_ = LoadModel(model_path_.c_str(), *sim_, mujoco_node_);
   if (!mj_model_)
   {
-    RCLCPP_FATAL(rclcpp::get_logger("MujocoSystemInterface"), "Mujoco failed to load '%s'", model_path_.c_str());
+    RCLCPP_FATAL(rclcpp::get_logger("MujocoSystemInterface"), "Mujoco failed to load the model");
     return hardware_interface::CallbackReturn::ERROR;
   }
 
