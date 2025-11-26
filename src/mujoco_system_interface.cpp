@@ -504,8 +504,6 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
   const auto pids_config_file = get_parameter("pids_config_file");
   rclcpp::NodeOptions node_options;
   node_options.append_parameter_override("use_sim_time", rclcpp::ParameterValue(true));
-  node_options.allow_undeclared_parameters(true);
-  node_options.automatically_declare_parameters_from_overrides(true);
   if (pids_config_file.has_value())
   {
     // Check if the file exists
