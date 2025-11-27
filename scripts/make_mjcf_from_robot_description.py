@@ -47,7 +47,7 @@ def add_mujoco_info(raw_xml, output_filepath):
 
     mujoco_element = dom.createElement("mujoco")
     compiler_element = dom.createElement("compiler")
-    compiler_element.setAttribute("meshdir", output_filepath+"/assets")
+    compiler_element.setAttribute("meshdir", os.path.join(output_filepath, "assets"))
     compiler_element.setAttribute("balanceinertia", "true")
     compiler_element.setAttribute("discardvisual", "false")
     compiler_element.setAttribute("strippath", "false")
@@ -78,7 +78,7 @@ def remove_tag(xml_string, tag_to_remove):
     return xmldoc.toprettyxml()
 
 
-def extract_mesh_info(raw_xml):
+def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
     robot = URDF.from_xml_string(raw_xml)
     mesh_info_dict = {}
 
@@ -107,6 +107,28 @@ def extract_mesh_info(raw_xml):
 
             uri = geom.filename  # full URI
             stem = pathlib.Path(uri).stem  # filename without extension
+
+            #
+            is_decomposed  = False
+            if asset_dir:
+                if stem in decompose_dict:
+                    # decomposes mesh
+                    candidate_path = f"{asset_dir}/decomposed/{stem}/{stem}.obj"
+                    if os.path.exists(candidate_path):
+                        new_uri = candidate_path
+                        is_decomposed  = True
+                    else: 
+                        new_uri = uri   
+                else:
+                    # full mesh
+                    candidate_path = f"{asset_dir}/full/{stem}.obj"
+                    if os.path.exists(candidate_path):
+                        new_uri = candidate_path
+                    else:
+                        new_uri = uri 
+            else:
+                new_uri = uri  
+
             scale = " ".join(f"{v}" for v in geom.scale) if geom.scale else "1.0 1.0 1.0"
             rgba = resolve_color(vis)
 
@@ -114,7 +136,8 @@ def extract_mesh_info(raw_xml):
             mesh_info_dict.setdefault(
                 stem,
                 {
-                    "filename": uri,
+                    "is_decomposed": is_decomposed ,
+                    "filename": new_uri,
                     "scale": scale,
                     "color": rgba,
                 },
@@ -178,11 +201,14 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
 
         # Import the .stl or .dae file
         if filename_ext.lower() == ".stl":
+            if filename_no_ext in decompose_dict and not convert_stl_to_obj:
+                raise ValueError(
+                    "The --convert_stl_to_obj argument must be specified to decompose .stl mesh")
             if convert_stl_to_obj:
                 bpy.ops.wm.stl_import(filepath=full_filepath)
 
                 # bring in file color from urdf
-                new_mat = bpy.data.materials.new(name="new_mat_color")
+                new_mat = bpy.data.materials.new(name=f"material_{filename_no_ext}")
                 new_mat.diffuse_color = mesh_item["color"]
                 o = bpy.context.selected_objects[0]
                 o.active_material = new_mat
@@ -197,6 +223,18 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.stl")
                 pass
         elif filename_ext.lower() == ".obj":
+            # If import external .obj import also the .mtl since it is needed for the obj2mjcf
+            if convert_stl_to_obj:
+                mesh_dir = os.path.splitext(full_filepath)[0]
+                mtl_file = mesh_dir+ ".mtl"
+                if os.path.exists(mtl_file):
+                    shutil.copy2(mtl_file, f"{directory}assets/{assets_relative_filepath}.mtl")
+                else:
+                    print(f"Not found {full_filepath}, obj2mjcf requires it.")
+                if mesh_item["is_decomposed"]:
+                    if os.path.exists(mesh_dir):
+                        dst_base = f"{directory}assets/"+f"{DECOMPOSED_PATH_NAME}/{filename_no_ext}/{filename_no_ext}"
+                        shutil.copytree(mesh_dir, dst_base, dirs_exist_ok=True)
             shutil.copy2(full_filepath, f"{directory}assets/{assets_relative_filepath}.obj")
             xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.obj")
             pass
@@ -272,7 +310,7 @@ def set_up_axis_to_z_up(dae_file_path):
     return modified_data
 
 
-def run_obj2mjcf(output_filepath, decompose_dict):
+def run_obj2mjcf(output_filepath, decompose_dict, mesh_info_dict):
     # remove the folders in the asset directory so that we are clean to run obj2mjcf
     with os.scandir(f"{output_filepath}assets/{COMPOSED_PATH_NAME}") as entries:
         for entry in entries:
@@ -281,14 +319,21 @@ def run_obj2mjcf(output_filepath, decompose_dict):
 
     # remove the folders in the asset directory so that we are clean to run obj2mjcf
     top_level_path = f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}"
+    backup_dir = tempfile.mkdtemp()
     for item in os.listdir(top_level_path):
-        first_level_path = os.path.join(top_level_path, item)
-        if os.path.isdir(first_level_path):
-            # Now check inside this first-level directory
-            for sub_item in os.listdir(first_level_path):
-                second_level_path = os.path.join(first_level_path, sub_item)
-                if os.path.isdir(second_level_path):
-                    shutil.rmtree(second_level_path)
+        # keep this folder
+        if mesh_info_dict[item]["is_decomposed"]:  
+            src = os.path.join(top_level_path, item)
+            dst = os.path.join(backup_dir, item)
+            shutil.copytree(src, dst)
+        else:
+            first_level_path = os.path.join(top_level_path, item)
+            if os.path.isdir(first_level_path):
+                # Now check inside this first-level directory
+                for sub_item in os.listdir(first_level_path):
+                    second_level_path = os.path.join(first_level_path, sub_item)
+                    if os.path.isdir(second_level_path):
+                        shutil.rmtree(second_level_path)
 
     # run obj2mjcf to generate folders of processed objs
     cmd = ["obj2mjcf", "--obj-dir", f"{output_filepath}assets/{COMPOSED_PATH_NAME}", "--save-mjcf"]
@@ -296,17 +341,29 @@ def run_obj2mjcf(output_filepath, decompose_dict):
 
     # run obj2mjcf to generate folders of processed objs with decompose option for decomposed components
     for mesh_name, threshold in decompose_dict.items():
-        cmd = [
-            "obj2mjcf",
-            "--obj-dir",
-            f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{mesh_name}",
-            "--save-mjcf",
-            "--decompose",
-            "--coacd-args.threshold",
-            threshold,
-        ]
-        subprocess.run(cmd)
+        if not mesh_info_dict[mesh_name]["is_decomposed"]:
+            cmd = [
+                "obj2mjcf",
+                "--obj-dir",
+                f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{mesh_name}",
+                "--save-mjcf",
+                "--decompose",
+                "--coacd-args.threshold",
+                threshold,
+            ]
+            subprocess.run(cmd)
 
+    for item in os.listdir(backup_dir):
+        src = os.path.join(backup_dir, item)
+        dst = os.path.join(top_level_path, item)
+
+        if os.path.exists(dst):
+            shutil.rmtree(dst)  # remove if obj2mjcf recreated something
+
+        shutil.copytree(src, dst)
+    
+    shutil.rmtree(backup_dir)
+    
 
 def update_obj_assets(dom, output_filepath, mesh_info_dict):
     # Find the <asset> element
@@ -965,7 +1022,7 @@ def fix_mujoco_description(
     # shutil.copy2(full_filepath, destination_file)
 
     # Run conversions for mjcf
-    run_obj2mjcf(output_filepath, decompose_dict)
+    run_obj2mjcf(output_filepath, decompose_dict, mesh_info_dict)
 
     # Parse the DAE file
     dom = minidom.parse(full_filepath)
