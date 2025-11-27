@@ -368,6 +368,11 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
   ui_thread_ = std::thread([this, sim_ready]() {
     sim_ = std::make_unique<mj::Simulate>(std::make_unique<mj::GlfwAdapter>(), &cam_, &opt_, &pert_,
                                           /* is_passive = */ false);
+
+    // Hide UI panels programmatically
+    sim_->ui0_enable = false;  // Hide left panel
+    sim_->ui1_enable = false;  // Hide right panel
+                                        
     // Notify sim that we are ready
     sim_ready->set_value();
 
