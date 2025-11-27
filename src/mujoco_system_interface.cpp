@@ -1186,7 +1186,6 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
                          "Position command interface for the joint : %s is not supported with velocity or motor "
                          "actuator without defining the PIDs",
                          joint.name.c_str());
-            continue;
           }
         }
         else if (last_joint_state.actuator_type == ActuatorType::POSITION)
@@ -1201,13 +1200,10 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       {
         // Velocity command interface:
         // Direct control for velocity actuators; velocity PID required for motor or custom actuators.
-        if (last_joint_state.actuator_type == ActuatorType::POSITION)
-        {
-          RCLCPP_ERROR(rclcpp::get_logger("MujocoSystemInterface"),
-                       "Velocity command interface for the joint : %s is not supported with position actuator",
-                       joint.name.c_str());
-          continue;
-        }
+        RCLCPP_ERROR_EXPRESSION(rclcpp::get_logger("MujocoSystemInterface"),
+                    last_joint_state.actuator_type == ActuatorType::POSITION,
+                    "Velocity command interface for the joint : %s is not supported with position actuator",
+                    joint.name.c_str());
         if (last_joint_state.actuator_type == ActuatorType::VELOCITY)
         {
           // Direct velocity control enabled for velocity actuator
@@ -1243,7 +1239,6 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
                          "Velocity command interface for the joint : %s is not supported with motor or custom actuator "
                          "without defining the PIDs",
                          joint.name.c_str());
-            continue;
           }
         }
       }
@@ -1251,16 +1246,14 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       {
         // Effort command interface:
         // Direct control for effort actuators; not supported for position or velocity actuators.
-        if (last_joint_state.actuator_type == ActuatorType::POSITION ||
-            last_joint_state.actuator_type == ActuatorType::VELOCITY)
-        {
-          RCLCPP_ERROR(rclcpp::get_logger("MujocoSystemInterface"),
-                       "Effort command interface for the joint : %s is not supported with position or velocity "
-                       "actuator. Skipping it.",
-                       joint.name.c_str());
-          continue;
-        }
-        else
+        RCLCPP_ERROR_EXPRESSION(rclcpp::get_logger("MujocoSystemInterface"),
+              last_joint_state.actuator_type == ActuatorType::POSITION || 
+              last_joint_state.actuator_type == ActuatorType::VELOCITY,
+              "Effort command interface for the joint : %s is not supported with position or velocity actuator."
+              "Skipping it.",
+              joint.name.c_str());
+        if (last_joint_state.actuator_type == ActuatorType::MOTOR ||
+            last_joint_state.actuator_type == ActuatorType::CUSTOM)
         {
           // Direct effort control enabled for MOTOR or CUSTOM actuator
           last_joint_state.is_effort_control_enabled = true;
