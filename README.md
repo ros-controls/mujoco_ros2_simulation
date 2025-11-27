@@ -148,6 +148,46 @@ Could map to the following hardware interface:
   </joint>
 ```
 
+**Supported modes between MuJoCo actuators and ros2_control command interfaces:**
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2" style="border:none;"></th>
+      <th style="border:none;"></th>
+      <th colspan="3" style="text-align:center;">MuJoCo Actuators</th>
+    </tr>
+    <tr>
+      <th style="border:none;"></th>
+      <th>position</th>
+      <th>velocity</th>
+      <th>motor, general, etc </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="3" style="text-align:center;">ros2 control<br>command<br>interfaces</th>
+      <th>position</th>
+      <td style="background:#c6efce;">Native support</td>
+      <td style="background:#ffeb9c;">Supported using PIDs</td>
+      <td style="background:#ffeb9c;">Supported using PIDs</td>
+    </tr>
+    <tr>
+      <th>velocity</th>
+      <td style="background:#ffc7ce;">Not supported</td>
+      <td style="background:#c6efce;">Native support</td>
+      <td style="background:#ffeb9c;">Supported using PIDs</td>
+    </tr>
+    <tr>
+      <th>effort</th>
+      <td style="background:#ffc7ce;">Not supported</td>
+      <td style="background:#ffc7ce;">Not supported</td>
+      <td style="background:#c6efce;">Native support</td>
+    </tr>
+  </tbody>
+</table>
+
+
 Switching actuator/control types on the fly is an [open issue](#13).
 
 ### Sensors
