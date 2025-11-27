@@ -1201,9 +1201,9 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         // Velocity command interface:
         // Direct control for velocity actuators; velocity PID required for motor or custom actuators.
         RCLCPP_ERROR_EXPRESSION(rclcpp::get_logger("MujocoSystemInterface"),
-                    last_joint_state.actuator_type == ActuatorType::POSITION,
-                    "Velocity command interface for the joint : %s is not supported with position actuator",
-                    joint.name.c_str());
+                                last_joint_state.actuator_type == ActuatorType::POSITION,
+                                "Velocity command interface for the joint : %s is not supported with position actuator",
+                                joint.name.c_str());
         if (last_joint_state.actuator_type == ActuatorType::VELOCITY)
         {
           // Direct velocity control enabled for velocity actuator
@@ -1246,12 +1246,13 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
       {
         // Effort command interface:
         // Direct control for effort actuators; not supported for position or velocity actuators.
-        RCLCPP_ERROR_EXPRESSION(rclcpp::get_logger("MujocoSystemInterface"),
-              last_joint_state.actuator_type == ActuatorType::POSITION || 
-              last_joint_state.actuator_type == ActuatorType::VELOCITY,
-              "Effort command interface for the joint : %s is not supported with position or velocity actuator."
-              "Skipping it.",
-              joint.name.c_str());
+        RCLCPP_ERROR_EXPRESSION(
+            rclcpp::get_logger("MujocoSystemInterface"),
+            last_joint_state.actuator_type == ActuatorType::POSITION ||
+                last_joint_state.actuator_type == ActuatorType::VELOCITY,
+            "Effort command interface for the joint : %s is not supported with position or velocity actuator."
+            "Skipping it.",
+            joint.name.c_str());
         if (last_joint_state.actuator_type == ActuatorType::MOTOR ||
             last_joint_state.actuator_type == ActuatorType::CUSTOM)
         {
