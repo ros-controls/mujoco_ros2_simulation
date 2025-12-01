@@ -108,17 +108,15 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
             uri = geom.filename  # full URI
             stem = pathlib.Path(uri).stem  # filename without extension
 
+            # Path of the existing .stl or .obj file, if it already exists
             if asset_dir:
                 if stem in decompose_dict:
-                    # decomposes mesh
-                    candidate_path = f"{asset_dir}/decomposed/{stem}/{stem}.obj"
-                    if os.path.exists(candidate_path):
-                        new_uri = candidate_path
-                    else: 
-                        new_uri = uri   
+                    # decomposed mesh
+                    candidate_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/{stem}/{stem}.obj"
                 else:
                     # full mesh
-                    candidate_path = f"{asset_dir}/full/{stem}.obj"
+                    candidate_path = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}.obj"
+                    print(f"Using existing obj for {stem}")
                     if os.path.exists(candidate_path):
                         new_uri = candidate_path
                     else:
@@ -302,10 +300,12 @@ def set_up_axis_to_z_up(dae_file_path):
     return modified_data
 
 
-def run_obj2mjcf(output_filepath, decompose_dict, mesh_info_dict):
+def run_obj2mjcf(output_filepath, decompose_dict):
+    
+    # Create temporal folder uused for the backup existing asset 
     backup_dir = tempfile.mkdtemp()
-    backup_composed = os.path.join(backup_dir, "composed")
-    backup_decomposed = os.path.join(backup_dir, "decomposed")
+    backup_composed = os.path.join(backup_dir, COMPOSED_PATH_NAME)
+    backup_decomposed = os.path.join(backup_dir, DECOMPOSED_PATH_NAME)
     os.makedirs(backup_composed, exist_ok=True)
     os.makedirs(backup_decomposed, exist_ok=True)
 
@@ -1025,7 +1025,7 @@ def fix_mujoco_description(
     # shutil.copy2(full_filepath, destination_file)
 
     # Run conversions for mjcf
-    run_obj2mjcf(output_filepath, decompose_dict, mesh_info_dict)
+    run_obj2mjcf(output_filepath, decompose_dict)
 
     # Parse the DAE file
     dom = minidom.parse(full_filepath)
