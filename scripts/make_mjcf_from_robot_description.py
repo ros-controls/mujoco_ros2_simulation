@@ -111,16 +111,15 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
             # Path of the existing .stl or .obj file, if it already exists
             if asset_dir:
                 if stem in decompose_dict:
-                    # decomposed mesh
-                    candidate_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/{stem}/{stem}.obj"
+                    candidate_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/{stem}/{stem}/{stem}.obj"
                 else:
-                    # full mesh
-                    candidate_path = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}.obj"
+                    candidate_path = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}/{stem}.obj"
+
+                if os.path.exists(candidate_path):
                     print(f"Using existing obj for {stem}")
-                    if os.path.exists(candidate_path):
-                        new_uri = candidate_path
-                    else:
-                        new_uri = uri 
+                    new_uri = candidate_path
+                else:
+                    new_uri = uri 
             else:
                 new_uri = uri  
 
@@ -217,12 +216,16 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.stl")
                 pass
         elif filename_ext.lower() == ".obj":
-            if convert_stl_to_obj:
+            # mesh_dir = os.path.splitext(full_filepath)[0]
+            mesh_dir = os.path.dirname(os.path.splitext(full_filepath)[0])
+            if convert_stl_to_obj and os.path.exists(mesh_dir):
                 # If import PREVIOUS GENERATED .obj 
-                mesh_dir = os.path.splitext(full_filepath)[0]
-                if os.path.exists(mesh_dir):
-                    dst_base = f"{directory}assets/{assets_relative_filepath}"
-                    shutil.copytree(mesh_dir, dst_base, dirs_exist_ok=True)
+                if filename_no_ext in decompose_dict:
+                    dst_base= f"{directory}assets/{DECOMPOSED_PATH_NAME}/{filename_no_ext}/{filename_no_ext}/"
+                else:
+                    dst_base = f"{directory}assets/{COMPOSED_PATH_NAME}/{filename_no_ext}"
+                shutil.copytree(mesh_dir, dst_base, dirs_exist_ok=True)
+                xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.obj")
             else:
                 #If import .obj files from URDF 
                 shutil.copy2(full_filepath, f"{directory}assets/{assets_relative_filepath}.obj")
