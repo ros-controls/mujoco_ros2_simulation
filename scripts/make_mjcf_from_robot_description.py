@@ -1311,6 +1311,9 @@ def main(args=None):
 
     parsed_args = parser.parse_args(args_without_filename)
 
+    if parsed_args.asset_dir is not None and not parsed_args.convert_stl_to_obj:
+        parser.error("The argument --asset_dir needs --convert_stl_to_obj to be specified")
+
     # Load URDF from file, string, or topic
     urdf_path = None
     if parsed_args.urdf:
