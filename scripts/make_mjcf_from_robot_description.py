@@ -108,15 +108,12 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
             uri = geom.filename  # full URI
             stem = pathlib.Path(uri).stem  # filename without extension
 
-            #
-            is_decomposed  = False
             if asset_dir:
                 if stem in decompose_dict:
                     # decomposes mesh
                     candidate_path = f"{asset_dir}/decomposed/{stem}/{stem}.obj"
                     if os.path.exists(candidate_path):
                         new_uri = candidate_path
-                        is_decomposed  = True
                     else: 
                         new_uri = uri   
                 else:
@@ -136,7 +133,6 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
             mesh_info_dict.setdefault(
                 stem,
                 {
-                    "is_decomposed": is_decomposed ,
                     "filename": new_uri,
                     "scale": scale,
                     "color": rgba,
@@ -227,10 +223,7 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 # If import PREVIOUS GENERATED .obj 
                 mesh_dir = os.path.splitext(full_filepath)[0]
                 if os.path.exists(mesh_dir):
-                    if mesh_item["is_decomposed"]:
-                        dst_base = f"{directory}assets/"+f"{DECOMPOSED_PATH_NAME}/{mesh_name}/{mesh_name}"
-                    else:
-                        dst_base = f"{directory}assets/"+f"{COMPOSED_PATH_NAME}/{mesh_name}"
+                    dst_base = f"{directory}assets/{assets_relative_filepath}"
                     shutil.copytree(mesh_dir, dst_base, dirs_exist_ok=True)
             else:
                 #If import .obj files from URDF 
@@ -335,10 +328,9 @@ def run_obj2mjcf(output_filepath, decompose_dict, mesh_info_dict):
                     second_level_path = os.path.join(first_level_path, sub_item)
                     if os.path.isdir(second_level_path):
                         # keep this folder
-                        if mesh_info_dict[item]["is_decomposed"]:  
-                            src = second_level_path
-                            dst = os.path.join(backup_decomposed, item)
-                            shutil.copytree(src, dst)
+                        src = second_level_path
+                        dst = os.path.join(backup_decomposed, item)
+                        shutil.copytree(src, dst)
                         shutil.rmtree(second_level_path)
 
     # run obj2mjcf to generate folders of processed objs
@@ -347,7 +339,6 @@ def run_obj2mjcf(output_filepath, decompose_dict, mesh_info_dict):
 
     # run obj2mjcf to generate folders of processed objs with decompose option for decomposed components
     for mesh_name, threshold in decompose_dict.items():
-        if not mesh_info_dict[mesh_name]["is_decomposed"]:
             cmd = [
                 "obj2mjcf",
                 "--obj-dir",
