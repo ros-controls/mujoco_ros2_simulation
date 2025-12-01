@@ -326,6 +326,7 @@ ros2 launch mujoco_ros2_simulation test_robot.launch.py
 
 > [!NOTE]
 > Rendering contexts in containers can be tricky.
+
 Users may need to tweak the compose file to support their specific host OS or GPUs.
 For more information refer to the comments in the compose file.
 
