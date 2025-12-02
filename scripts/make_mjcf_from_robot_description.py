@@ -28,6 +28,8 @@ import subprocess
 import tempfile
 import PyKDL
 import sys
+import json
+import math
 
 import numpy as np
 
@@ -111,15 +113,30 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
             # Path of the existing .stl or .obj file, if it already exists
             if asset_dir:
                 if stem in decompose_dict:
-                    candidate_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/{stem}/{stem}/{stem}.obj"
-                else:
-                    candidate_path = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}/{stem}.obj"
+                    decomposed_obj_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/{stem}/{stem}/{stem}.obj"
+                    settings_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/decomposition_thresholds.json"
 
-                if os.path.exists(candidate_path):
-                    print(f"Using existing obj for {stem}")
-                    new_uri = candidate_path
+                    if os.path.exists(decomposed_obj_path) and os.path.exists(settings_path):
+                        with open(settings_path, "r") as f:
+                            data = json.load(f)
+                            used_threshold = float(data.get(f"{stem}"))
+                        # Use existing decomposed object only if it has the same thresold, otherwise regenerate it.
+                        if math.isclose(used_threshold, float(decompose_dict[stem]), rel_tol=1e-9):
+                            print(f"Using existing decomposed obj for {stem} with matching threshold {used_threshold}")
+                            new_uri = decomposed_obj_path
+                        else:
+                            print(f"Existing decomposed obj for {stem} has different threshold {used_threshold} with respect to {decompose_dict[stem]}. Regenerating...")
+                            new_uri = uri
+                    else:
+                        new_uri = uri
                 else:
-                    new_uri = uri 
+                    composed_obj_path = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}/{stem}.obj"
+
+                    if os.path.exists(composed_obj_path):
+                        print(f"Using existing obj for {stem}")
+                        new_uri = composed_obj_path
+                    else:
+                        new_uri = uri 
             else:
                 new_uri = uri  
 
@@ -316,6 +333,14 @@ def run_obj2mjcf(output_filepath, decompose_dict):
     cmd = ["obj2mjcf", "--obj-dir", f"{output_filepath}assets/{COMPOSED_PATH_NAME}", "--save-mjcf"]
     subprocess.run(cmd)
 
+    thresholds_file = os.path.join(f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}", "decomposition_thresholds.json")
+
+    if os.path.exists(thresholds_file):
+        with open(thresholds_file, "r") as f:
+            thresholds_data = json.load(f)
+    else:
+        thresholds_data = {}
+
     # run obj2mjcf to generate folders of processed objs with decompose option for decomposed components
     for mesh_name, threshold in decompose_dict.items():
             cmd = [
@@ -328,6 +353,11 @@ def run_obj2mjcf(output_filepath, decompose_dict):
                 threshold,
             ]
             subprocess.run(cmd)
+
+            thresholds_data[mesh_name] = float(threshold)
+    
+    with open(thresholds_file, "w") as f:
+        json.dump(thresholds_data, f, indent=4)
     
 
 def update_obj_assets(dom, output_filepath, mesh_info_dict):
