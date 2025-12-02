@@ -1186,9 +1186,18 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         // Position command interface
         // Direct control for position actuators; position PID required for velocity, motor, or custom actuators.
 
-        if (last_joint_state.actuator_type == ActuatorType::VELOCITY ||
-            last_joint_state.actuator_type == ActuatorType::MOTOR ||
-            last_joint_state.actuator_type == ActuatorType::CUSTOM)
+        if (last_joint_state.actuator_type == ActuatorType::POSITION)
+        {
+          RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
+                      "Using MuJoCo position actuator for the joint : '%s'", joint.name.c_str());
+          // Direct position control enabled for position actuator
+          last_joint_state.is_position_control_enabled = true;
+          last_joint_state.position_command =
+              should_override_start_position ? mj_data_->ctrl[joint_state.mj_actuator_id] : last_joint_state.position;
+        }
+        else if (last_joint_state.actuator_type == ActuatorType::VELOCITY ||
+                 last_joint_state.actuator_type == ActuatorType::MOTOR ||
+                 last_joint_state.actuator_type == ActuatorType::CUSTOM)
         {
           last_joint_state.pos_pid =
               std::make_shared<control_toolbox::PidROS>(mujoco_node_, "pid_gains.position." + joint.name, "", false);
@@ -1217,13 +1226,6 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
                          joint.name.c_str());
           }
         }
-        else if (last_joint_state.actuator_type == ActuatorType::POSITION)
-        {
-          // Direct position control enabled for position actuator
-          last_joint_state.is_position_control_enabled = true;
-          last_joint_state.position_command =
-              should_override_start_position ? mj_data_->ctrl[joint_state.mj_actuator_id] : last_joint_state.position;
-        }
       }
       else if (command_if.name.find(hardware_interface::HW_IF_VELOCITY) != std::string::npos)
       {
@@ -1235,6 +1237,8 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
                                 joint.name.c_str());
         if (last_joint_state.actuator_type == ActuatorType::VELOCITY)
         {
+          RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
+                      "Using MuJoCo velocity actuator for the joint : '%s'", joint.name.c_str());
           // Direct velocity control enabled for velocity actuator
           last_joint_state.is_velocity_control_enabled = true;
           last_joint_state.velocity_command =
@@ -1285,6 +1289,8 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         if (last_joint_state.actuator_type == ActuatorType::MOTOR ||
             last_joint_state.actuator_type == ActuatorType::CUSTOM)
         {
+          RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
+                      "Using MuJoCo motor or custom actuator for the joint : '%s'", joint.name.c_str());
           // Direct effort control enabled for MOTOR or CUSTOM actuator
           last_joint_state.is_effort_control_enabled = true;
           last_joint_state.effort_command =
