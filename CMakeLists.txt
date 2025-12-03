@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(controller_manager REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(control_toolbox REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -74,7 +75,13 @@ else()
 
   set(MUJOCO_INCLUDE_DIR ${MUJOCO_DIR}/include)
   set(MUJOCO_SIMULATE_DIR ${MUJOCO_DIR}/simulate)
-  message(STATUS "MuJoCo library found: ${MUJOCO_LIB}")
+
+  message(STATUS "Installing ${MUJOCO_LIB} to the install directory...")
+  install(
+    DIRECTORY ${MUJOCO_DIR}/lib/
+    DESTINATION lib
+    FILES_MATCHING PATTERN "libmujoco.so*"
+  )
 endif()
 
 # Fetch lodepng dependency.
@@ -147,6 +154,10 @@ add_library(mujoco_ros2_simulation SHARED
     src/mujoco_cameras.cpp
     src/mujoco_lidar.cpp
 )
+# Ensure MuJoCo library can be found at runtime regardless of how it was installed above
+set_target_properties(mujoco_ros2_simulation PROPERTIES
+  INSTALL_RPATH "\$ORIGIN/../lib;${CMAKE_INSTALL_PREFIX}/lib"
+)
 target_link_libraries(mujoco_ros2_simulation
   ${MUJOCO_LIB}
   ${sensor_msgs_TARGETS}
@@ -158,6 +169,7 @@ target_link_libraries(mujoco_ros2_simulation
   pluginlib::pluginlib
   rclcpp::rclcpp
   rclcpp_lifecycle::rclcpp_lifecycle
+  control_toolbox::control_toolbox
   sensor_msgs::sensor_msgs_library
   Eigen3::Eigen
   Threads::Threads

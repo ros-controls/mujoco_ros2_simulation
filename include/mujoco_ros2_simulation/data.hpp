@@ -21,12 +21,33 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include "control_toolbox/pid_ros.hpp"
 
 #include <string>
 #include <vector>
 
 namespace mujoco_ros2_simulation
 {
+
+/**
+ * Maps to MuJoCo actuator types:
+ *  - MOTOR for MuJoCo motor actuator
+ *  - POSITION for MuJoCo position actuator
+ *  - VELOCITY for MuJoCo velocity actuator
+ *  - CUSTOM  for MuJoCo general actuator or other types
+ *
+ * \note the MuJoCo types are as per the MuJoCo documentation:
+ * https://mujoco.readthedocs.io/en/latest/XMLreference.html#actuator
+ */
+
+enum class ActuatorType
+{
+  UNKNOWN,
+  MOTOR,
+  POSITION,
+  VELOCITY,
+  CUSTOM
+};
 
 /**
  * Wrapper for mujoco actuators and relevant ROS HW interface data.
@@ -37,6 +58,9 @@ struct JointState
   double position;
   double velocity;
   double effort;
+  std::shared_ptr<control_toolbox::PidROS> pos_pid{ nullptr };
+  std::shared_ptr<control_toolbox::PidROS> vel_pid{ nullptr };
+  ActuatorType actuator_type{ ActuatorType::UNKNOWN };
   double position_command;
   double velocity_command;
   double effort_command;
@@ -51,8 +75,12 @@ struct JointState
   // Booleans record whether or not we should be writing commands to these interfaces
   // based on if they have been claimed.
   bool is_position_control_enabled{ false };
+  bool is_position_pid_control_enabled{ false };
+  bool is_velocity_pid_control_enabled{ false };
   bool is_velocity_control_enabled{ false };
   bool is_effort_control_enabled{ false };
+  bool has_pos_pid{ false };
+  bool has_vel_pid{ false };
 };
 
 template <typename T>
