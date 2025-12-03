@@ -32,11 +32,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
 
-    use_pid = DeclareLaunchArgument(
-        'use_pid',
-        default_value='false',
-        description='If we should use PID control'
-    )
+    use_pid = DeclareLaunchArgument("use_pid", default_value="false", description="If we should use PID control")
 
     robot_description_content = Command(
         [
@@ -51,7 +47,7 @@ def generate_launch_description():
             ),
             " ",
             "use_pid:=",
-            LaunchConfiguration('use_pid'),
+            LaunchConfiguration("use_pid"),
         ]
     )
 
