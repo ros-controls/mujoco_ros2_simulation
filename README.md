@@ -84,26 +84,6 @@ Just specify the plugin and point to a valid MJCF on launch:
   ...
 ```
 
-Due to compatibility issues, we use a [slightly modified ROS 2 control node](./src/mujoco_ros2_control_node.cpp).
-It is the same executable and parameters as the upstream, but requires updating the launchfile:
-
-```python
-    control_node = Node(
-        # Specify the control node from this package!
-        package="mujoco_ros2_simulation",
-        executable="ros2_control_node",
-        output="both",
-        parameters=[
-            {"use_sim_time": True},
-            controller_parameters,
-        ],
-    )
-```
-
-> **_NOTE_**: We can remove the the ROS 2 control node after the next ros2_control upstream release,
-as the simulation requires [this PR](https://github.com/ros-controls/ros2_control/pull/2654) to run.
-The hardware interface _should_ then be compatible with `humble`, `jazzy`, and `kilted`.
-
 ### Joints
 
 Joints in the ros2_control interface are mapped to actuators defined in the MJCF.

@@ -187,16 +187,6 @@ install(TARGETS mujoco_ros2_simulation
   LIBRARY DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install the ROS 2 control node
-add_executable(ros2_control_node src/mujoco_ros2_control_node.cpp)
-target_link_libraries(ros2_control_node PUBLIC
-  controller_manager::controller_manager
-)
-install(
-  TARGETS ros2_control_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME}
-)
-
 # Install python tools
 install(PROGRAMS
   scripts/find_missing_inertias.py
