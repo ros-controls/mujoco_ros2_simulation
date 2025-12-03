@@ -48,6 +48,14 @@ Just specify the plugin and point to a valid MJCF on launch:
       <param name="mujoco_model">$(find my_description)/description/scene.xml</param>
 
       <!--
+       Optional parameter to load the PIDs that can be used with the actuators loaded with the MuJoCo model.
+       The velocity actuator supports position mode with the PID gains, and the rest of the actuation models
+       support both position and velocity mode provided the corresponding PID gains. The gains should be in ROS
+       parameters format to be loaded by the control_toolbox::PidROS class.
+        -->
+      <param name="pids_config_file">$(find my_description)/config/pids.yaml</param>
+
+      <!--
        Optional parameter to override the speed scaling parameters from the Simulate App window
        and just attempt to run at whatever the desired rate is here. This allows users to run the simulation
        faster than real time. For example, at 500% speed as set here. If this param is omitted or set to
@@ -83,9 +91,16 @@ Just specify the plugin and point to a valid MJCF on launch:
 ### Joints
 
 Joints in the ros2_control interface are mapped to actuators defined in the MJCF.
-For now, we rely on Mujoco's PD level `ctrl` input for all actuator control.
+The system supports different joint control modes based on the actuator type and available command interfaces.
+
+We rely on MuJoCo's PD-level ctrl input for direct position, velocity, or effort control.
+For velocity, motor, or custom actuators, a position or velocity PID is created if specified using ROS parameters to enable accurate control.
+Incompatible actuator-interface combinations trigger an error.
+
 Refer to Mujoco's [actuation model](https://mujoco.readthedocs.io/en/stable/computation/index.html#geactuation) for more information.
-Of note, only one type of actuator per-joint can be controllable at a time, and the type CANNOT be switched during runtime (ie, switching from position to effort control is not supported).
+
+Of note, only one type of MuJoCo actuator per-joint can be controllable at a time, and the type CANNOT be switched during runtime (i.e., switching from position to motor actuator is not supported).
+However, the active command interface can be switched dynamically, allowing control to shift between position, velocity, or effort as supported by the actuator type.
 Users are required to manually adjust actuator types and command interfaces to ensure that they are compatible.
 
 For example a position controlled joint on the mujoco
@@ -109,6 +124,46 @@ Could map to the following hardware interface:
     <state_interface name="effort"/>
   </joint>
 ```
+
+**Supported modes between MuJoCo actuators and ros2_control command interfaces:**
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2" style="border:none;"></th>
+      <th style="border:none;"></th>
+      <th colspan="3" style="text-align:center;">MuJoCo Actuators</th>
+    </tr>
+    <tr>
+      <th style="border:none;"></th>
+      <th>position</th>
+      <th>velocity</th>
+      <th>motor, general, etc </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="3" style="text-align:center;">ros2 control<br>command<br>interfaces</th>
+      <th>position</th>
+      <td style="background:#c6efce;">Native support</td>
+      <td style="background:#ffeb9c;">Supported using PIDs</td>
+      <td style="background:#ffeb9c;">Supported using PIDs</td>
+    </tr>
+    <tr>
+      <th>velocity</th>
+      <td style="background:#ffc7ce;">Not supported</td>
+      <td style="background:#c6efce;">Native support</td>
+      <td style="background:#ffeb9c;">Supported using PIDs</td>
+    </tr>
+    <tr>
+      <th>effort</th>
+      <td style="background:#ffc7ce;">Not supported</td>
+      <td style="background:#ffc7ce;">Not supported</td>
+      <td style="background:#c6efce;">Native support</td>
+    </tr>
+  </tbody>
+</table>
+
 
 Switching actuator/control types on the fly is an [open issue](#13).
 

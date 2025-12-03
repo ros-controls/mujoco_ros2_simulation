@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(controller_manager REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(control_toolbox REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -118,7 +119,17 @@ ament_target_dependencies(mujoco_ros2_simulation
 )
 target_link_libraries(mujoco_ros2_simulation
   ${MUJOCO_LIB}
+  ${sensor_msgs_TARGETS}
   mujoco::libsimulate
+  controller_manager::controller_manager
+  controller_manager::controller_manager_parameters
+  hardware_interface::hardware_interface
+  hardware_interface::mock_components
+  pluginlib::pluginlib
+  rclcpp::rclcpp
+  rclcpp_lifecycle::rclcpp_lifecycle
+  control_toolbox::control_toolbox
+  sensor_msgs::sensor_msgs_library
   Eigen3::Eigen
   Threads::Threads
   lodepng
