@@ -1292,13 +1292,13 @@ def main(args=None):
         default=None,
         help="Optionally specify a defaults xml for default settings, actuators, options, and additional sensors",
     )
-    parser.add_argument("-o", "--output", default=None, help="Generated output path")
+    parser.add_argument("-o", "--output", default="mjcf_data", help="Generated output path")
     parser.add_argument("-p", "--publish_topic", required=False, default= None, help="Optionally specify the topic to publish the MuJoCo model")
     parser.add_argument("-c", "--convert_stl_to_obj", action="store_true", help="If we should convert .stls to .objs")
     parser.add_argument(
         "-s", "--save_only",
         action="store_true",
-        help="Save the generated files permanently. Without this flag a temporary directory is used."
+        help="Save files permanently on disk; without this flag, files go to a temporary directory"
     )
     parser.add_argument(
         "-f",
@@ -1310,7 +1310,13 @@ def main(args=None):
         "-a" ,"--asset_dir",
         required=False,
         default=None,
-        help="Optional path to a existing asset folder"
+        help="Optionally pass an existing folder with pre-generated OBJ meshes."
+    )
+    parser.add_argument(
+        "--scene",
+        required=False,
+        default=None,
+        help="OOptionally pass an existing xml for the scene"
     )
 
     # remove ros args to make argparser heppy
@@ -1319,9 +1325,6 @@ def main(args=None):
         args_without_filename.remove("--ros-args")
 
     parsed_args = parser.parse_args(args_without_filename)
-
-    if parsed_args.asset_dir is not None and not parsed_args.convert_stl_to_obj:
-        parser.error("The argument --asset_dir needs --convert_stl_to_obj to be specified")
 
     # Load URDF from file, string, or topic
     urdf_path = None
@@ -1343,34 +1346,35 @@ def main(args=None):
 
     convert_stl_to_obj = parsed_args.convert_stl_to_obj
 
+    # Use provided MuJoCo input or scene XML files if given; otherwise use the URDF.
+    mujoco_inputs_file = parsed_args.mujoco_inputs or urdf_path
+    mujoco_scene_file = parsed_args.scene or urdf_path
+    
+    raw_inputs, processed_inputs = parse_inputs_xml(mujoco_inputs_file)
+    scene_inputs = parse_scene_xml(mujoco_scene_file)
+    decompose_dict, cameras_dict, modify_element_dict, lidar_dict = get_processed_mujoco_inputs(processed_inputs)
+
+    output_filepath = parsed_args.output
+    if not os.path.isabs(parsed_args.output) and parsed_args.publish_topic:
+        output_filepath = os.path.join(os.getcwd(), parsed_args.output)
     # Determine the path of the output directory 
-    temp_dir=None
     if parsed_args.save_only:
-        if parsed_args.output:
-            output_filepath = os.path.join(parsed_args.output, "")
-            print(f"Using destination directory: {output_filepath}")
-        else:
-            raise ValueError(" --save-only is missing the path of the output folder.")
+        # Grab the output directory and ensure it ends with '/'
+        output_filepath = os.path.join(output_filepath, "")
     elif parsed_args.publish_topic:
         temp_dir = tempfile.TemporaryDirectory()
         output_filepath = os.path.join(temp_dir.name, "")
-        print(f"Using temporary directory: {output_filepath}")
     else:
         raise ValueError("You must specify at least one of the following options: --publish_topic or --save-only with the path of the folder.")
 
     # Add a free joint to the urdf
     if request_add_free_joint:
         urdf = add_urdf_free_joint(urdf)
-
-    # If exists the mujoco_input.xml get the input tags from that file, otherwise try to get them from URDF
-    mujoco_inputs_file = parsed_args.mujoco_inputs or urdf_path
     
-    raw_inputs, processed_inputs = parse_inputs_xml(mujoco_inputs_file)
-    decompose_dict, cameras_dict, modify_element_dict, lidar_dict = get_processed_mujoco_inputs(processed_inputs)
-
+    print(f"Using destination directory: {output_filepath}")
 
     # Add required mujoco tags to the starting URDF
-    xml_data = add_mujoco_info(urdf, output_filepath)
+    xml_data = add_mujoco_info(urdf, output_filepath, parsed_args.publish_topic)
 
     # get rid of collision data, assuming the visual data is much better resolution.
     # not sure if this is the best move...
@@ -1395,6 +1399,7 @@ def main(args=None):
         output_filepath,
         mesh_info_dict,
         raw_inputs,
+        scene_inputs,
         urdf,
         decompose_dict,
         cameras_dict,
@@ -1402,13 +1407,10 @@ def main(args=None):
         lidar_dict,
         request_add_free_joint,
     )
-   
+    
+    # Publish the MuJoCo model to the specified topic if provided
     if parsed_args.publish_topic:
         publish_model_on_topic(parsed_args.publish_topic, output_filepath, args)
-    
-    if temp_dir is not None:
-            temp_dir.cleanup()
-            print("Temporary directory cleaned up.", flush=True)
 
 
 if __name__ == "__main__":
