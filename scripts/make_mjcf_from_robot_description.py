@@ -116,7 +116,7 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
 
             uri = geom.filename  # full URI
             stem = pathlib.Path(uri).stem  # filename without extension
-           
+
             # Select the mesh file: use a pre-generated OBJ if available and valid; otherwise use the original
             is_pre_generated = False
             new_uri = uri  # default fallback
@@ -129,25 +129,30 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
 
                     if os.path.exists(mesh_file) and os.path.exists(settings_file):
                         try:
-                            with open(settings_file, "r") as f:
+                            with open(settings_file) as f:
                                 data = json.load(f)
                                 used_threshold = float(data.get(f"{stem}"))
                         except (FileNotFoundError, PermissionError, json.JSONDecodeError) as e:
                             print(f"Warning: could not read thresholds for {stem}: {e}")
                             used_threshold = None
-                        # Use existing decomposed object only if it has the same thresold, otherwise regenerate it.
-                        if used_threshold is not None and math.isclose(used_threshold, float(decompose_dict[stem]), rel_tol=1e-9):
+                        # Use existing decomposed object only if it has the same threshold, otherwise regenerate it.
+                        if used_threshold is not None and math.isclose(
+                            used_threshold, float(decompose_dict[stem]), rel_tol=1e-9
+                        ):
                             new_uri = mesh_file
                             is_pre_generated = True
                         else:
-                            print(f"Existing decomposed obj for {stem} has different threshold {used_threshold} than required {decompose_dict[stem]}. Regenerating...")
+                            print(
+                                f"Existing decomposed obj for {stem} has different threshold {used_threshold} "
+                                f"than required {decompose_dict[stem]}. Regenerating..."
+                            )
                 else:
                     # Composed mesh: check if a pre-generated OBJ exists
                     mesh_file = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}/{stem}.obj"
 
                     if os.path.exists(mesh_file):
                         new_uri = mesh_file
-                        is_pre_generated = True 
+                        is_pre_generated = True
 
             scale = " ".join(f"{v}" for v in geom.scale) if geom.scale else "1.0 1.0 1.0"
             rgba = resolve_color(vis)
@@ -222,8 +227,7 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
         # Import the .stl or .dae file
         if filename_ext.lower() == ".stl":
             if filename_no_ext in decompose_dict and not convert_stl_to_obj:
-                raise ValueError(
-                    "The --convert_stl_to_obj argument must be specified to decompose .stl mesh")
+                raise ValueError("The --convert_stl_to_obj argument must be specified to decompose .stl mesh")
             if convert_stl_to_obj:
                 bpy.ops.wm.stl_import(filepath=full_filepath)
 
@@ -243,14 +247,14 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.stl")
                 pass
         elif filename_ext.lower() == ".obj":
-            #If import .obj files from URDF 
+            # If import .obj files from URDF
             if not mesh_item["is_pre_generated"]:
                 shutil.copy2(full_filepath, f"{directory}assets/{assets_relative_filepath}.obj")
                 # If the .obj depends on a mtl should copy also this
                 old_directory = os.path.dirname(mesh_item["filename"])
-                if(os.path.exists(old_directory+"/material.mtl")):
-                    final_path=os.path.dirname(assets_relative_filepath)
-                    shutil.copy2(old_directory+"/material.mtl", f"{directory}assets/{final_path}/material.mtl")
+                if os.path.exists(old_directory + "/material.mtl"):
+                    final_path = os.path.dirname(assets_relative_filepath)
+                    shutil.copy2(old_directory + "/material.mtl", f"{directory}assets/{final_path}/material.mtl")
             pass
             # objs are ok as is
         elif filename_ext.lower() == ".dae":
@@ -349,7 +353,7 @@ def run_obj2mjcf(output_filepath, decompose_dict):
     thresholds_file = os.path.join(f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}", "decomposition_thresholds.json")
 
     if os.path.exists(thresholds_file):
-        with open(thresholds_file, "r") as f:
+        with open(thresholds_file) as f:
             thresholds_data = json.load(f)
     else:
         thresholds_data = {}
@@ -368,10 +372,10 @@ def run_obj2mjcf(output_filepath, decompose_dict):
         subprocess.run(cmd)
 
         thresholds_data[mesh_name] = float(threshold)
-    
+
     with open(thresholds_file, "w") as f:
         json.dump(thresholds_data, f, indent=4)
-    
+
 
 def update_obj_assets(dom, output_filepath, mesh_info_dict):
     # Find the <asset> element
@@ -699,7 +703,7 @@ def parse_inputs_xml(filename=None):
 
     dom = minidom.parse(filename)
     root = dom.documentElement
-    
+
     raw_inputs = None
     processed_inputs = None
 
@@ -714,7 +718,7 @@ def parse_inputs_xml(filename=None):
                 processed_inputs = child
 
     elif root.tagName == "robot":
-        # The file is a URDF 
+        # The file is a URDF
         mujoco_inputs_node = None
 
         # find <mujoco_inputs>
@@ -736,7 +740,9 @@ def parse_inputs_xml(filename=None):
             elif child.tagName == "processed_inputs":
                 processed_inputs = child
     else:
-        raise ValueError( f"Root tag in file must be either 'mujoco_inputs' (standalone XML) or 'robot' (URDF), not '{root.tagName}'")   
+        raise ValueError(
+            f"Root tag in file must be either 'mujoco_inputs' (standalone XML) or 'robot' (URDF), not '{root.tagName}'"
+        )
 
     return raw_inputs, processed_inputs
 
@@ -746,7 +752,7 @@ def parse_scene_xml(filename=None):
     This script can accept the scene in the form of an xml file. This allows users to inject this data
     into the MJCF that is not necessarily included in the URDF.
     """
-    
+
     if not filename:
         return None
 
@@ -754,7 +760,7 @@ def parse_scene_xml(filename=None):
 
     dom = minidom.parse(filename)
     root = dom.documentElement
-    
+
     scene_inputs = None
 
     if root.tagName == "mujoco":
@@ -763,7 +769,7 @@ def parse_scene_xml(filename=None):
         return scene_inputs
 
     elif root.tagName == "robot":
-        # The file is a URDF 
+        # The file is a URDF
         mujoco_inputs_node = None
 
         # find <mujoco_inputs>
@@ -783,9 +789,11 @@ def parse_scene_xml(filename=None):
             if child.tagName == "scene":
                 scene_inputs = child
     else:
-        raise ValueError( f"Root tag in file must be either 'mujoco_inputs' (standalone XML) or 'robot' (URDF), not '{root.tagName}'") 
-    
-    return scene_inputs  
+        raise ValueError(
+            f"Root tag in file must be either 'mujoco_inputs' (standalone XML) or 'robot' (URDF), not '{root.tagName}'"
+        )
+
+    return scene_inputs
 
 
 def add_free_joint(dom, urdf, joint_name="floating_base_joint"):
@@ -1075,12 +1083,12 @@ def copy_pre_generated_meshes(output_filepath, mesh_info_dict, decompose_dict):
         full_path = mesh_item["filename"]
         mesh_dir = os.path.dirname(os.path.splitext(full_path)[0])
 
-        if mesh_item ["is_pre_generated"]:
+        if mesh_item["is_pre_generated"]:
             if filename_no_ext in decompose_dict:
-                dst_base= f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{filename_no_ext}/{filename_no_ext}/"
+                dst_base = f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{filename_no_ext}/{filename_no_ext}/"
             else:
                 dst_base = f"{output_filepath}assets/{COMPOSED_PATH_NAME}/{filename_no_ext}"
-            
+
             shutil.copytree(mesh_dir, dst_base, dirs_exist_ok=True)
 
 
@@ -1255,17 +1263,15 @@ def publish_model_on_topic(publish_topic, output_filepath, args=None):
     from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy
 
     # Remove leading slash if present
-    publish_topic = publish_topic.lstrip('/')
-    
-     # --- Node ROS2 for model publishing MJCF ---
+    publish_topic = publish_topic.lstrip("/")
+
+    # --- Node ROS2 for model publishing MJCF ---
     class MjcfPublisher(Node):
         def __init__(self, mjcf_path):
-            super().__init__('mjcf_publisher')
+            super().__init__("mjcf_publisher")
 
             qos_profile = QoSProfile(
-            depth=1,
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
+                depth=1, reliability=QoSReliabilityPolicy.RELIABLE, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
             )
 
             self.publisher_ = self.create_publisher(String, publish_topic, qos_profile)
@@ -1273,7 +1279,7 @@ def publish_model_on_topic(publish_topic, output_filepath, args=None):
             self.mjcf_path = mjcf_path
 
         def publish_mjcf(self):
-            with open(self.mjcf_path, 'r') as f:
+            with open(self.mjcf_path) as f:
                 xml_content = f.read()
             msg = String()
             msg.data = xml_content
@@ -1293,6 +1299,7 @@ def publish_model_on_topic(publish_topic, output_filepath, args=None):
             rclpy.shutdown()
         except Exception:
             pass
+
 
 def add_urdf_free_joint(urdf):
     """
@@ -1331,7 +1338,8 @@ def add_urdf_free_joint(urdf):
 
     # <child link="old_root"/>
     child_elem = urdf_dom.createElement("child")
-    child_elem.setAttribute("link", old_root)  # replace with your real root link name
+    # replace with your real root link name
+    child_elem.setAttribute("link", old_root)
     virtual_joint.appendChild(child_elem)
 
     # <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -1368,12 +1376,19 @@ def main(args=None):
         help="Optionally specify a defaults xml for default settings, actuators, options, and additional sensors",
     )
     parser.add_argument("-o", "--output", default="mjcf_data", help="Generated output path")
-    parser.add_argument("-p", "--publish_topic", required=False, default= None, help="Optionally specify the topic to publish the MuJoCo model")
+    parser.add_argument(
+        "-p",
+        "--publish_topic",
+        required=False,
+        default=None,
+        help="Optionally specify the topic to publish the MuJoCo model",
+    )
     parser.add_argument("-c", "--convert_stl_to_obj", action="store_true", help="If we should convert .stls to .objs")
     parser.add_argument(
-        "-s", "--save_only",
+        "-s",
+        "--save_only",
         action="store_true",
-        help="Save files permanently on disk; without this flag, files go to a temporary directory"
+        help="Save files permanently on disk; without this flag, files go to a temporary directory",
     )
     parser.add_argument(
         "-f",
@@ -1382,17 +1397,13 @@ def main(args=None):
         help="Adds a free joint before the root link of the robot in the urdf before conversion",
     )
     parser.add_argument(
-        "-a" ,"--asset_dir",
+        "-a",
+        "--asset_dir",
         required=False,
         default=None,
-        help="Optionally pass an existing folder with pre-generated OBJ meshes."
+        help="Optionally pass an existing folder with pre-generated OBJ meshes.",
     )
-    parser.add_argument(
-        "--scene",
-        required=False,
-        default=None,
-        help="OOptionally pass an existing xml for the scene"
-    )
+    parser.add_argument("--scene", required=False, default=None, help="OOptionally pass an existing xml for the scene")
 
     # remove ros args to make argparser heppy
     args_without_filename = sys.argv[1:]
@@ -1413,7 +1424,7 @@ def main(args=None):
             urdf = get_urdf_from_rsp(args)
         # Create a tempfile and store the URDF
         tmp = tempfile.NamedTemporaryFile()
-        with open(tmp.name, 'w') as f:
+        with open(tmp.name, "w") as f:
             f.write(urdf)
         urdf_path = tmp.name
 
@@ -1424,7 +1435,7 @@ def main(args=None):
     # Use provided MuJoCo input or scene XML files if given; otherwise use the URDF.
     mujoco_inputs_file = parsed_args.mujoco_inputs or urdf_path
     mujoco_scene_file = parsed_args.scene or urdf_path
-    
+
     raw_inputs, processed_inputs = parse_inputs_xml(mujoco_inputs_file)
     scene_inputs = parse_scene_xml(mujoco_scene_file)
     decompose_dict, cameras_dict, modify_element_dict, lidar_dict = get_processed_mujoco_inputs(processed_inputs)
@@ -1432,7 +1443,7 @@ def main(args=None):
     output_filepath = parsed_args.output
     if not os.path.isabs(parsed_args.output) and parsed_args.publish_topic:
         output_filepath = os.path.join(os.getcwd(), parsed_args.output)
-    # Determine the path of the output directory 
+    # Determine the path of the output directory
     if parsed_args.save_only:
         # Grab the output directory and ensure it ends with '/'
         output_filepath = os.path.join(output_filepath, "")
@@ -1440,12 +1451,15 @@ def main(args=None):
         temp_dir = tempfile.TemporaryDirectory()
         output_filepath = os.path.join(temp_dir.name, "")
     else:
-        raise ValueError("You must specify at least one of the following options: --publish_topic or --save-only with the path of the folder.")
+        raise ValueError(
+            "You must specify at least one of the following options: "
+            "--publish_topic or --save-only with the path of the folder."
+        )
 
     # Add a free joint to the urdf
     if request_add_free_joint:
         urdf = add_urdf_free_joint(urdf)
-    
+
     print(f"Using destination directory: {output_filepath}")
 
     # Add required mujoco tags to the starting URDF
@@ -1482,7 +1496,7 @@ def main(args=None):
         lidar_dict,
         request_add_free_joint,
     )
-    
+
     # Publish the MuJoCo model to the specified topic if provided
     if parsed_args.publish_topic:
         publish_model_on_topic(parsed_args.publish_topic, output_filepath, args)

@@ -59,34 +59,20 @@ def generate_launch_description():
 
     converter_command = [
         "python3",
-        PathJoinSubstitution([
-            FindPackageShare("mujoco_ros2_simulation"),
-            "scripts", 
-            "make_mjcf_from_robot_description.py", 
-        ]),
-        # "--urdf", PathJoinSubstitution([
-        #     FindPackageShare("mujoco_ros2_simulation"),
-        #     "test_resources",
-        #     "test_robot.urdf",
-        # ]),
-        # "--m", PathJoinSubstitution([
-        #     FindPackageShare("mujoco_ros2_simulation"),
-        #     "test_resources",
-        #     "kangaroo_inputs.xml",
-        # ]),
-        # "--o", PathJoinSubstitution([
-        #     FindPackageShare("mujoco_ros2_simulation"),
-        #     "test_resources",
-        #     "output_mjcf_command",        
-        # ]),
-        # "--s",
+        PathJoinSubstitution(
+            [
+                FindPackageShare("mujoco_ros2_simulation"),
+                "scripts",
+                "make_mjcf_from_robot_description.py",
+            ]
+        ),
     ]
 
     converter_process = ExecuteProcess(
         cmd=converter_command,
         name="make_mjcf_from_robot_description",
         output="screen",
-    #   True to see the output
+        #   True to see the output
         emulate_tty=True,
     )
 
