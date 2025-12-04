@@ -507,6 +507,11 @@ MujocoSystemInterface::on_init(const hardware_interface::HardwareComponentInterf
       glfwSetWindowIcon(window_pointer, 1, &icon);
     }
 
+    // Set glfw window size to max size of the primary monitor
+    GLFWwindow* window_pointer = glfwGetCurrentContext();
+    const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    glfwSetWindowSize(window_pointer, mode->width, mode->height);
+
     // Hide UI panels programmatically
     sim_->ui0_enable = false;  // Hide left panel
     sim_->ui1_enable = false;  // Hide right panel
