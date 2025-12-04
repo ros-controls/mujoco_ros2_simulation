@@ -318,7 +318,6 @@ def set_up_axis_to_z_up(dae_file_path):
 
 
 def run_obj2mjcf(output_filepath, decompose_dict):
-
     # remove the folders in the asset directory so that we are clean to run obj2mjcf
     with os.scandir(f"{output_filepath}assets/{COMPOSED_PATH_NAME}") as entries:
         for entry in entries:
@@ -328,13 +327,13 @@ def run_obj2mjcf(output_filepath, decompose_dict):
     # remove the folders in the asset directory so that we are clean to run obj2mjcf
     top_level_path = f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}"
     for item in os.listdir(top_level_path):
-            first_level_path = os.path.join(top_level_path, item)
-            if os.path.isdir(first_level_path):
-                # Now check inside this first-level directory
-                for sub_item in os.listdir(first_level_path):
-                    second_level_path = os.path.join(first_level_path, sub_item)
-                    if os.path.isdir(second_level_path):
-                        shutil.rmtree(second_level_path)
+        first_level_path = os.path.join(top_level_path, item)
+        if os.path.isdir(first_level_path):
+            # Now check inside this first-level directory
+            for sub_item in os.listdir(first_level_path):
+                second_level_path = os.path.join(first_level_path, sub_item)
+                if os.path.isdir(second_level_path):
+                    shutil.rmtree(second_level_path)
 
     # run obj2mjcf to generate folders of processed objs
     cmd = ["obj2mjcf", "--obj-dir", f"{output_filepath}assets/{COMPOSED_PATH_NAME}", "--save-mjcf"]
@@ -350,18 +349,18 @@ def run_obj2mjcf(output_filepath, decompose_dict):
 
     # run obj2mjcf to generate folders of processed objs with decompose option for decomposed components
     for mesh_name, threshold in decompose_dict.items():
-            cmd = [
-                "obj2mjcf",
-                "--obj-dir",
-                f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{mesh_name}",
-                "--save-mjcf",
-                "--decompose",
-                "--coacd-args.threshold",
-                threshold,
-            ]
-            subprocess.run(cmd)
+        cmd = [
+            "obj2mjcf",
+            "--obj-dir",
+            f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{mesh_name}",
+            "--save-mjcf",
+            "--decompose",
+            "--coacd-args.threshold",
+            threshold,
+        ]
+        subprocess.run(cmd)
 
-            thresholds_data[mesh_name] = float(threshold)
+        thresholds_data[mesh_name] = float(threshold)
     
     with open(thresholds_file, "w") as f:
         json.dump(thresholds_data, f, indent=4)
