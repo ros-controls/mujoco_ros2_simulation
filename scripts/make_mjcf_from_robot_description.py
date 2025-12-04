@@ -116,36 +116,38 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
 
             uri = geom.filename  # full URI
             stem = pathlib.Path(uri).stem  # filename without extension
+           
+            # Select the mesh file: use a pre-generated OBJ if available and valid; otherwise use the original
+            is_pre_generated = False
+            new_uri = uri  # default fallback
 
-            # Path of the existing .stl or .obj file, if it already exists
             if asset_dir:
                 if stem in decompose_dict:
-                    decomposed_obj_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/{stem}/{stem}/{stem}.obj"
-                    settings_path = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/decomposition_thresholds.json"
+                    # Decomposed mesh: check if a pre-generated OBJ exists and threshold matches
+                    mesh_file = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/{stem}/{stem}/{stem}.obj"
+                    settings_file = f"{asset_dir}/{DECOMPOSED_PATH_NAME}/decomposition_thresholds.json"
 
-                    if os.path.exists(decomposed_obj_path) and os.path.exists(settings_path):
-                        with open(settings_path, "r") as f:
-                            data = json.load(f)
-                            used_threshold = float(data.get(f"{stem}"))
+                    if os.path.exists(mesh_file) and os.path.exists(settings_file):
+                        try:
+                            with open(settings_file, "r") as f:
+                                data = json.load(f)
+                                used_threshold = float(data.get(f"{stem}"))
+                        except (FileNotFoundError, PermissionError, json.JSONDecodeError) as e:
+                            print(f"Warning: could not read thresholds for {stem}: {e}")
+                            used_threshold = None
                         # Use existing decomposed object only if it has the same thresold, otherwise regenerate it.
-                        if math.isclose(used_threshold, float(decompose_dict[stem]), rel_tol=1e-9):
-                            print(f"Using existing decomposed obj for {stem} with matching threshold {used_threshold}")
-                            new_uri = decomposed_obj_path
+                        if used_threshold is not None and math.isclose(used_threshold, float(decompose_dict[stem]), rel_tol=1e-9):
+                            new_uri = mesh_file
+                            is_pre_generated = True
                         else:
-                            print(f"Existing decomposed obj for {stem} has different threshold {used_threshold} with respect to {decompose_dict[stem]}. Regenerating...")
-                            new_uri = uri
-                    else:
-                        new_uri = uri
+                            print(f"Existing decomposed obj for {stem} has different threshold {used_threshold} than required {decompose_dict[stem]}. Regenerating...")
                 else:
-                    composed_obj_path = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}/{stem}.obj"
+                    # Composed mesh: check if a pre-generated OBJ exists
+                    mesh_file = f"{asset_dir}/{COMPOSED_PATH_NAME}/{stem}/{stem}.obj"
 
-                    if os.path.exists(composed_obj_path):
-                        print(f"Using existing obj for {stem}")
-                        new_uri = composed_obj_path
-                    else:
-                        new_uri = uri 
-            else:
-                new_uri = uri  
+                    if os.path.exists(mesh_file):
+                        new_uri = mesh_file
+                        is_pre_generated = True 
 
             scale = " ".join(f"{v}" for v in geom.scale) if geom.scale else "1.0 1.0 1.0"
             rgba = resolve_color(vis)
@@ -154,6 +156,7 @@ def extract_mesh_info(raw_xml, asset_dir, decompose_dict):
             mesh_info_dict.setdefault(
                 stem,
                 {
+                    "is_pre_generated": is_pre_generated,
                     "filename": new_uri,
                     "scale": scale,
                     "color": rgba,
@@ -240,10 +243,14 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.stl")
                 pass
         elif filename_ext.lower() == ".obj":
-            mesh_dir = os.path.dirname(os.path.splitext(full_filepath)[0])
-            if not (convert_stl_to_obj and os.path.exists(mesh_dir)):
-                #If import .obj files from URDF 
+            #If import .obj files from URDF 
+            if not mesh_item["is_pre_generated"]:
                 shutil.copy2(full_filepath, f"{directory}assets/{assets_relative_filepath}.obj")
+                # If the .obj depends on a mtl should copy also this
+                old_directory = os.path.dirname(mesh_item["filename"])
+                if(os.path.exists(old_directory+"/material.mtl")):
+                    final_path=os.path.dirname(assets_relative_filepath)
+                    shutil.copy2(old_directory+"/material.mtl", f"{directory}assets/{final_path}/material.mtl")
             pass
             # objs are ok as is
         elif filename_ext.lower() == ".dae":
@@ -1056,6 +1063,27 @@ def add_modifiers(dom, modify_element_dict):
     return dom
 
 
+def copy_pre_generated_meshes(output_filepath, mesh_info_dict, decompose_dict):
+    """
+    Copies pre-generated mesh folders into the final MJCF assets structure.
+    """
+
+    for mesh_name in mesh_info_dict:
+        mesh_item = mesh_info_dict[mesh_name]
+        filename = os.path.basename(mesh_item["filename"])
+        filename_no_ext = os.path.splitext(filename)[0]
+        full_path = mesh_item["filename"]
+        mesh_dir = os.path.dirname(os.path.splitext(full_path)[0])
+
+        if mesh_item ["is_pre_generated"]:
+            if filename_no_ext in decompose_dict:
+                dst_base= f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{filename_no_ext}/{filename_no_ext}/"
+            else:
+                dst_base = f"{output_filepath}assets/{COMPOSED_PATH_NAME}/{filename_no_ext}"
+            
+            shutil.copytree(mesh_dir, dst_base, dirs_exist_ok=True)
+
+
 def fix_mujoco_description(
     output_filepath,
     mesh_info_dict,
@@ -1079,22 +1107,8 @@ def fix_mujoco_description(
     # Run conversions for mjcf
     run_obj2mjcf(output_filepath, decompose_dict)
 
-     #Copy existing folders to the final directory
-    for mesh_name in mesh_info_dict:
-        mesh_item = mesh_info_dict[mesh_name]
-        filename = os.path.basename(mesh_item["filename"])
-        filename_no_ext = os.path.splitext(filename)[0]
-        filename_ext = os.path.splitext(filename)[1]
-        full = mesh_item["filename"]
-        if filename_ext.lower() == ".obj":
-            mesh_dir = os.path.dirname(os.path.splitext(full)[0])
-            if os.path.exists(mesh_dir):
-                # # If import PREVIOUS GENERATED .obj 
-                if filename_no_ext in decompose_dict:
-                    dst_base= f"{output_filepath}assets/{DECOMPOSED_PATH_NAME}/{filename_no_ext}/{filename_no_ext}/"
-                else:
-                    dst_base = f"{output_filepath}assets/{COMPOSED_PATH_NAME}/{filename_no_ext}"
-                shutil.copytree(mesh_dir, dst_base, dirs_exist_ok=True)
+    # Copy pre-geerated mesh folders to the final directory
+    copy_pre_generated_meshes(output_filepath, mesh_info_dict, decompose_dict)
 
     # Parse the DAE file
     dom = minidom.parse(full_filepath)
