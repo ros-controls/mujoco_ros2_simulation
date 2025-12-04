@@ -44,12 +44,19 @@ DECOMPOSED_PATH_NAME = "decomposed"
 COMPOSED_PATH_NAME = "full"
 
 
-def add_mujoco_info(raw_xml, output_filepath):
+def add_mujoco_info(raw_xml, output_filepath, publish_topic):
     dom = minidom.parseString(raw_xml)
 
     mujoco_element = dom.createElement("mujoco")
     compiler_element = dom.createElement("compiler")
-    compiler_element.setAttribute("meshdir", os.path.join(output_filepath, "assets"))
+
+    # Use relative path for fixed directory otherwise use absolute path
+    if not publish_topic:
+        meshdir = "assets"
+    else:
+        meshdir = os.path.join(output_filepath, "assets")
+
+    compiler_element.setAttribute("meshdir", meshdir)
     compiler_element.setAttribute("balanceinertia", "true")
     compiler_element.setAttribute("discardvisual", "false")
     compiler_element.setAttribute("strippath", "false")
