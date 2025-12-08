@@ -148,6 +148,8 @@
 
       <!-- Override the slowdown settings in the Simulate App and run at 3x speed -->
       <param name="sim_speed_factor">3.0</param>
+
+      <!-- If set to true, will not launch the Simulate App window -->
       <param name="headless">$(arg headless)</param>
 
       <!-- Publish camera images at 6 hz -->

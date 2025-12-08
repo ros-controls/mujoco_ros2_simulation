@@ -68,6 +68,9 @@ namespace mujoco_ros2_simulation
 namespace mj = ::mujoco;
 namespace mju = ::mujoco::sample_util;
 
+/**
+ * No-op UI adapter to support running the drivers in a headless environment.
+ */
 class HeadlessAdapter : public mj::PlatformUIAdapter
 {
 public:
