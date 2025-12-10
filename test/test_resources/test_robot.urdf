@@ -168,6 +168,7 @@
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
+      <state_interface name="torque"/>
     </joint>
     <joint name="joint2">
       <command_interface name="position"/>
@@ -179,6 +180,7 @@
       </state_interface>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
+      <state_interface name="torque"/>
     </joint>
 
     <!-- For cameras, the sensor name _must_ match the camera name in the MJCF -->
