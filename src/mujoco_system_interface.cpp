@@ -769,9 +769,10 @@ std::vector<hardware_interface::StateInterface> MujocoSystemInterface::export_st
         {
           new_state_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_VELOCITY, &joint.velocity);
         }
-        else if (state_if.name == hardware_interface::HW_IF_EFFORT)
+        else if (state_if.name == hardware_interface::HW_IF_EFFORT ||
+                 state_if.name == hardware_interface::HW_IF_TORQUE || state_if.name == hardware_interface::HW_IF_FORCE)
         {
-          new_state_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_EFFORT, &joint.effort);
+          new_state_interfaces.emplace_back(joint.name, state_if.name, &joint.effort);
         }
       }
     }
@@ -917,10 +918,12 @@ std::vector<hardware_interface::CommandInterface> MujocoSystemInterface::export_
           if (joint.is_velocity_control_enabled || joint.is_velocity_pid_control_enabled)
             new_command_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_VELOCITY, &joint.velocity_command);
         }
-        else if (command_if.name == hardware_interface::HW_IF_EFFORT)
+        else if (command_if.name == hardware_interface::HW_IF_EFFORT ||
+                 command_if.name == hardware_interface::HW_IF_TORQUE ||
+                 command_if.name == hardware_interface::HW_IF_FORCE)
         {
           if (joint.is_effort_control_enabled)
-            new_command_interfaces.emplace_back(joint.name, hardware_interface::HW_IF_EFFORT, &joint.effort_command);
+            new_command_interfaces.emplace_back(joint.name, command_if.name, &joint.effort_command);
         }
       }
     }
@@ -1015,11 +1018,13 @@ MujocoSystemInterface::perform_command_mode_switch(const std::vector<std::string
         RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
                     "Joint %s: velocity control enabled (position, effort disabled)", joint_name.c_str());
       }
-      else if (interface_type == hardware_interface::HW_IF_EFFORT)
+      else if (interface_type == hardware_interface::HW_IF_EFFORT ||
+               interface_type == hardware_interface::HW_IF_TORQUE || interface_type == hardware_interface::HW_IF_FORCE)
       {
         joint_it->is_effort_control_enabled = true;
         RCLCPP_INFO(rclcpp::get_logger("MujocoSystemInterface"),
-                    "Joint %s: effort control enabled (position, velocity disabled)", joint_name.c_str());
+                    "Joint %s: %s control enabled (position, velocity disabled)", joint_name.c_str(),
+                    interface_type.c_str());
       }
     }
     else
@@ -1034,7 +1039,8 @@ MujocoSystemInterface::perform_command_mode_switch(const std::vector<std::string
         joint_it->is_velocity_control_enabled = false;
         joint_it->is_velocity_pid_control_enabled = false;
       }
-      else if (interface_type == hardware_interface::HW_IF_EFFORT)
+      else if (interface_type == hardware_interface::HW_IF_EFFORT ||
+               interface_type == hardware_interface::HW_IF_TORQUE || interface_type == hardware_interface::HW_IF_FORCE)
       {
         joint_it->is_effort_control_enabled = false;
       }
@@ -1284,7 +1290,8 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
         last_joint_state.velocity =
             should_override_start_position ? mj_data_->qvel[joint_state.mj_vel_adr] : get_initial_value(state_if);
       }
-      else if (state_if.name == hardware_interface::HW_IF_EFFORT)
+      else if (state_if.name == hardware_interface::HW_IF_EFFORT || state_if.name == hardware_interface::HW_IF_TORQUE ||
+               state_if.name == hardware_interface::HW_IF_FORCE)
       {
         // We never set data for effort from an initial conditions file, so just default to the initial value if it exists.
         last_joint_state.effort = get_initial_value(state_if);
@@ -1407,7 +1414,9 @@ void MujocoSystemInterface::register_joints(const hardware_interface::HardwareIn
           }
         }
       }
-      else if (command_if.name.find(hardware_interface::HW_IF_EFFORT) != std::string::npos)
+      else if (command_if.name.find(hardware_interface::HW_IF_EFFORT) != std::string::npos ||
+               command_if.name.find(hardware_interface::HW_IF_TORQUE) != std::string::npos ||
+               command_if.name.find(hardware_interface::HW_IF_FORCE) != std::string::npos)
       {
         // Effort command interface:
         // Direct control for effort actuators; not supported for position or velocity actuators.
