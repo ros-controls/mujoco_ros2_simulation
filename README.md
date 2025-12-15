@@ -195,6 +195,8 @@ Could map to the following hardware interface:
   </tbody>
 </table>
 
+> [!NOTE]
+> The `torque` and `force` command/state interfaces are semantically equivalent to `effort`, and map to the same underlying data in the sim.
 
 Switching actuator/control types on the fly is an [open issue](#13).
 
