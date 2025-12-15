@@ -1012,8 +1012,7 @@ MujocoSystemInterface::perform_command_mode_switch(const std::vector<std::string
                interface_type == hardware_interface::HW_IF_TORQUE || interface_type == hardware_interface::HW_IF_FORCE)
       {
         joint_it->is_effort_control_enabled = true;
-        RCLCPP_INFO(get_logger(),
-                    "Joint %s: %s control enabled (position, velocity disabled)", joint_name.c_str(),
+        RCLCPP_INFO(get_logger(), "Joint %s: %s control enabled (position, velocity disabled)", joint_name.c_str(),
                     interface_type.c_str());
       }
     }
