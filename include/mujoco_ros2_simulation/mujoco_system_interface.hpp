@@ -186,6 +186,8 @@ private:
    */
   void publish_clock();
 
+  rclcpp::Logger get_logger() const;
+
   // System information
   std::string model_path_;
 
@@ -200,6 +202,9 @@ private:
   mjvCamera cam_;
   mjvOption opt_;
   mjvPerturb pert_;
+
+  // Logger
+  rclcpp::Logger logger_ = rclcpp::get_logger("MujocoSystemInterface");
 
   // Speed scaling parameter. if set to >0 then we ignore the value set in the simulate app and instead
   // attempt to loop at whatever this is set to. If this is <0, then we use the value from the app.
