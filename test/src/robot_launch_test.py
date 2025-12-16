@@ -131,6 +131,8 @@ class TestFixture(unittest.TestCase):
             msg.position[joint2_index], -0.5, delta=0.05, msg="joint2 did not reach the commanded position"
         )
 
+    # Runs the tests when the DISPLAY is set
+    @unittest.skipIf(os.environ.get("DISPLAY", "") == "", "Skipping camera tests in headless mode.")
     def test_camera_topics(self):
         topic_list = [
             ("/camera/color/image_raw", Image),
