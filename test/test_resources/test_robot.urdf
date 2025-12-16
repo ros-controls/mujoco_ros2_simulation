@@ -167,7 +167,10 @@
         <param name="initial_value">0.0</param>
       </state_interface>
       <state_interface name="velocity"/>
+
+      <!-- Effort and torque are semantically different but map to the same underlying data. -->
       <state_interface name="effort"/>
+      <state_interface name="torque"/>
     </joint>
     <joint name="joint2">
       <command_interface name="position"/>
@@ -178,7 +181,10 @@
         <param name="initial_value">0.0</param>
       </state_interface>
       <state_interface name="velocity"/>
+
+       <!-- Effort and torque are semantically different but map to the same underlying data. -->
       <state_interface name="effort"/>
+      <state_interface name="torque"/>
     </joint>
 
     <!-- For cameras, the sensor name _must_ match the camera name in the MJCF -->
