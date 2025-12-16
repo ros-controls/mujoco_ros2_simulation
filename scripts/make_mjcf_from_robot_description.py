@@ -194,6 +194,8 @@ def replace_package_names(xml_data):
 def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, decompose_dict):
     # keep track of files we have already processed so we don't do it again
     converted_filenames = []
+    # keep track of what material number we are on to get unique materials
+    mtl_num = 0
 
     # clean assets directory and remake required paths
     if os.path.exists(f"{directory}assets/"):
@@ -271,14 +273,30 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 # Load scene using trimesh
                 scene = trimesh.load(temp_filepath)
 
-                # DAEs load as a Scene, we need to convert to a single mesh
-                if isinstance(scene, trimesh.Scene):
-                    # Concatenate all geometries in the scene
-                    mesh = scene.to_mesh()
-                else:
-                    mesh = scene
+                # give the material a unique name so that it can be properly referenced
+                mtl_name = "mtl_" + str(mtl_num)
+                mtl_filepath = os.path.dirname(output_path) + f"/{mtl_name}"
 
-                mesh.export(output_path)
+                scene.export(output_path, include_color=True, mtl_name=mtl_name)
+
+                # we need to modify the material names to not all be material_X so they don't conflict
+                # all of the objs will have a line that looks like
+                #   usemtl material_0
+                # and all of the mtl files will have a line that looks like
+                #   newmtl material_0
+                # We will modify both of them to be numberd by mtl_num like so
+                #   usemtl material_{mtl_num}_0
+                #   newmtl material_{mtl_num}_0
+
+                if os.path.exists(mtl_filepath):
+                    for filepath in [mtl_filepath, output_path]:
+                        with open(filepath, "r") as f:
+                            data = f.read()
+                        data = data.replace("material_", f"material_{mtl_num}_")
+                        with open(filepath, "w") as f:
+                            f.write(data)
+                # increment
+                mtl_num = mtl_num + 1
             finally:
                 if os.path.exists(temp_filepath):
                     os.remove(temp_filepath)
