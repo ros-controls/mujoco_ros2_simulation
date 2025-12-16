@@ -302,12 +302,17 @@ def convert_to_objs(mesh_info_dict, directory, xml_data, convert_stl_to_obj, dec
                 if "color" in mesh_item:
                     # trimesh expects 0-255 uint8 for colors
                     rgba = mesh_item["color"]
-                    color_uint8 = (np.array(rgba) * 255).astype(np.uint8)
-                    # Apply to all faces
-                    mesh.visual.face_colors = color_uint8
+                    # make a material for the rgba values and export it
+                    mtl_modifier = f"m{mtl_num}"
+                    mtl_name = "mtl_" + mtl_modifier
+                    material = trimesh.visual.material.SimpleMaterial(name=mtl_name, diffuse=rgba)  # RGBA
+                    mesh.visual = trimesh.visual.TextureVisuals(material=material)
+
+                    # increment material number
+                    mtl_num = mtl_num + 1
 
                 # Export to OBJ
-                mesh.export(output_path)
+                mesh.export(output_path, include_color=True, mtl_name=mtl_name)
                 xml_data = xml_data.replace(full_filepath, f"{assets_relative_filepath}.obj")
 
             else:
