@@ -39,7 +39,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           file: docker/Dockerfile
-          tags: mujoco_ros2_simulation:${{ github.head_ref || github.ref_name }}
+          tags: mujoco_ros2_control:${{ github.head_ref || github.ref_name }}
           target: mujoco_ros
           build-args: |
             ROS_DISTRO=${{ matrix.ros_distro }}
@@ -48,15 +48,11 @@ jobs:
       - name: Run tests
         run: |
           docker run --rm \
-            mujoco_ros2_simulation:${{ github.head_ref || github.ref_name }} \
+            mujoco_ros2_control:${{ github.head_ref || github.ref_name }} \
             bash -c "
               colcon test &&
               colcon test-result --verbose
             "
-      - name: Clean up Docker image
-        if: always()
-        run: |
-          docker image rm --force mujoco_ros2_simulation:${{ github.head_ref || github.ref_name }} || true
 
   pixi_jazzy_build_and_test:
     env:
