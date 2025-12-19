@@ -71,6 +71,32 @@ def generate_launch_description():
                 "make_mjcf_from_robot_description.py",
             ]
         ),
+        "--urdf",
+        PathJoinSubstitution(
+            [
+                FindPackageShare("mujoco_ros2_simulation"),
+                "test_resources",
+                "test_robot.urdf",
+            ]
+        ),
+        "--m",
+        PathJoinSubstitution(
+            [
+                FindPackageShare("mujoco_ros2_simulation"),
+                "test_resources",
+                "test_inputs.xml",
+            ]
+        ),
+        "--scene",
+        PathJoinSubstitution(
+            [
+                FindPackageShare("mujoco_ros2_simulation"),
+                "test_resources",
+                "scene.xml",
+            ]
+        ),
+        "--publish_topic",
+        "/mujoco_robot_description",
     ]
 
     converter_process = ExecuteProcess(
