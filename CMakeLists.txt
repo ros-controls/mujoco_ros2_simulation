@@ -2,6 +2,49 @@ cmake_minimum_required(VERSION 3.16)
 
 project(mujoco_ros2_control)
 
+# Find mold linker (required dependency, Linux only)
+# mold is Linux-specific and not available on macOS/Windows
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_program(MOLD_LINKER
+    NAMES mold
+    PATHS /usr/bin /usr/local/bin /opt/conda/bin ${CONDA_PREFIX}/bin
+    NO_DEFAULT_PATH
+  )
+  if(NOT MOLD_LINKER)
+    find_program(MOLD_LINKER mold)
+  endif()
+
+  if(NOT MOLD_LINKER)
+    message(FATAL_ERROR "mold linker not found. Please install mold: sudo apt-get install mold")
+  endif()
+  message(STATUS "Found mold linker: ${MOLD_LINKER}")
+
+  # Set mold as the linker if not already set via environment
+  if(NOT DEFINED ENV{CXXFLAGS} OR NOT "$ENV{CXXFLAGS}" MATCHES "-fuse-ld=mold")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=mold")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=mold")
+    message(STATUS "Using mold linker for faster builds")
+  endif()
+else()
+  message(STATUS "mold linker skipped (not available on ${CMAKE_SYSTEM_NAME})")
+endif()
+
+# Find sccache (required dependency for compiler caching)
+# Try multiple methods: standard PATH, common install locations
+find_program(SCCACHE_PROGRAM
+  NAMES sccache
+  PATHS /usr/bin /usr/local/bin /opt/conda/bin ${CONDA_PREFIX}/bin
+  NO_DEFAULT_PATH
+)
+if(NOT SCCACHE_PROGRAM)
+  find_program(SCCACHE_PROGRAM sccache)
+endif()
+
+if(NOT SCCACHE_PROGRAM)
+  message(FATAL_ERROR "sccache not found. Please install sccache: sudo apt-get install sccache (or via cargo: cargo install sccache)")
+endif()
+message(STATUS "Found sccache: ${SCCACHE_PROGRAM}")
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -10,7 +53,50 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(controller_manager REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(glfw3 REQUIRED)
+
+# Find GLFW
+# Standard approach: use pkg-config for system packages (libglfw3-dev provides .pc file)
+# Fallback to CMake config for conda/pixi environments, then manual find
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(GLFW3 glfw3)
+endif()
+
+if(GLFW3_FOUND)
+  # Create glfw target from pkg-config (standard for system packages)
+  add_library(glfw INTERFACE)
+  target_include_directories(glfw INTERFACE ${GLFW3_INCLUDE_DIRS})
+  target_link_libraries(glfw INTERFACE ${GLFW3_LIBRARIES})
+  target_compile_options(glfw INTERFACE ${GLFW3_CFLAGS_OTHER})
+else()
+  # Fallback: try CMake config (for conda/pixi environments)
+  find_package(glfw3 QUIET)
+  if(glfw3_FOUND)
+    if(TARGET glfw3::glfw3 AND NOT TARGET glfw)
+      add_library(glfw ALIAS glfw3::glfw3)
+    elseif(TARGET glfw3 AND NOT TARGET glfw)
+      add_library(glfw ALIAS glfw3)
+    endif()
+  else()
+    # Last resort: manual find (shouldn't be needed if libglfw3-dev is installed)
+    find_library(GLFW3_LIBRARY
+      NAMES glfw glfw3
+      PATHS /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu
+    )
+    find_path(GLFW3_INCLUDE_DIR
+      NAMES GLFW/glfw3.h
+      PATHS /usr/include /usr/local/include
+    )
+    if(GLFW3_LIBRARY AND GLFW3_INCLUDE_DIR)
+      add_library(glfw INTERFACE)
+      target_include_directories(glfw INTERFACE ${GLFW3_INCLUDE_DIR})
+      target_link_libraries(glfw INTERFACE ${GLFW3_LIBRARY})
+    else()
+      message(FATAL_ERROR "GLFW3 not found. Please install libglfw3-dev: sudo apt-get install libglfw3-dev")
+    endif()
+  endif()
+endif()
+
 find_package(control_toolbox REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
