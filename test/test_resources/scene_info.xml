@@ -1,5 +1,4 @@
 <mujoco model="scene">
-  <include file="test_robot.xml"/>
 
   <statistic center="0.4 0 0.4" extent="1"/>
 
