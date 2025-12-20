@@ -1,4 +1,4 @@
-# MuJoCo ROS 2 Simulation
+# MuJoCo ros2_control
 
 This package contains a ROS 2 control system interface for the [MuJoCo Simulator](https://mujoco.readthedocs.io/en/3.3.4/overview.html).
 It was originally written for simulating robot hardware in NASA Johnson's [iMETRO facility](https://ntrs.nasa.gov/citations/20230015485).
