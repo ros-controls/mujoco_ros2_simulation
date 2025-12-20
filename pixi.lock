@@ -6,6 +6,8 @@ environments:
     - url: https://prefix.dev/robostack-jazzy/
     indexes:
     - https://pypi.org/simple
+    options:
+      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -2110,7 +2112,7 @@ packages:
   license: Apache-2.0 AND BSD-3-Clause AND PSF-2.0 AND MIT
   license_family: BSD
   purls:
-  - pkg:pypi/cryptography?source=compressed-mapping
+  - pkg:pypi/cryptography?source=hash-mapping
   size: 1716814
   timestamp: 1764805537696
 - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/cryptography-46.0.3-py312hf80642e_1.conda
