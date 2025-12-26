@@ -372,7 +372,7 @@ mjModel* loadModelFromTopic(rclcpp::Node::SharedPtr node)
       });
 
   auto start = std::chrono::steady_clock::now();
-  auto timeout = std::chrono::seconds(60);
+  auto timeout = std::chrono::seconds(120);
 
   while (robot_description.empty() && rclcpp::ok())
   {
